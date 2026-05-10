@@ -56,6 +56,29 @@ function uuid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+// Decodifica o `sub` (studentId) do JWT do QR sem verificar assinatura.
+// Usado APENAS para deduplicar leituras do mesmo aluno no client; a verificacao
+// real continua no backend.
+function decodeJwtSub(token: string): string | null {
+  try {
+    const [, payloadB64] = token.split('.');
+    if (!payloadB64) return null;
+    const padded = payloadB64 + '='.repeat((4 - (payloadB64.length % 4)) % 4);
+    const json = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+    const payload = JSON.parse(json) as { sub?: unknown };
+    return typeof payload.sub === 'string' ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+// O ZXing dispara o callback varias vezes em frames sucessivos quando o QR
+// esta bem alinhado, e o token JWT do aluno rotaciona a cada ~20s — entao um
+// lock por TOKEN nao basta. Usamos um lock por STUDENT (15s) + uma pausa
+// global apos cada accepted (1.5s) pra evitar leituras duplas indesejadas.
+const STUDENT_LOCK_MS = 15_000;
+const PAUSE_AFTER_SUCCESS_MS = 1500;
+
 export default function CompanyScannerPage() {
   const { event } = useActiveEvent();
   const online = useOnline();
@@ -66,9 +89,12 @@ export default function CompanyScannerPage() {
   const [logs, setLogs] = useState<ScanLog[]>([]);
   const [queued, setQueued] = useState(0);
   const [err, setErr] = useState<string | null>(null);
+  const [paused, setPaused] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const lockRef = useRef<Map<string, number>>(new Map());
+  const studentLockRef = useRef<Map<string, number>>(new Map());
+  const pausedUntilRef = useRef<number>(0);
 
   const refreshQueue = useCallback(async () => {
     if (!event) return;
@@ -115,9 +141,22 @@ export default function CompanyScannerPage() {
     async (token: string) => {
       if (!event || !selectedStamp) return;
       const now = Date.now();
-      const last = lockRef.current.get(token);
-      if (last && now - last < 3000) return;
+
+      // 1) pausa global apos accepted (evita beep duplo no mesmo frame)
+      if (now < pausedUntilRef.current) return;
+
+      // 2) lock por TOKEN (3s) — pega leituras do mesmo JWT em frames sucessivos
+      const lastForToken = lockRef.current.get(token);
+      if (lastForToken && now - lastForToken < 3000) return;
       lockRef.current.set(token, now);
+
+      // 3) lock por STUDENT (15s) — pega leituras do mesmo aluno mesmo apos
+      // o token rotacionar. Silencioso: nao mostra alerta de duplicado.
+      const studentId = decodeJwtSub(token);
+      if (studentId) {
+        const lastForStudent = studentLockRef.current.get(studentId);
+        if (lastForStudent && now - lastForStudent < STUDENT_LOCK_MS) return;
+      }
 
       const stamp = stamps.find((s) => s.id === selectedStamp);
       const stampTitulo = stamp?.titulo ?? 'Carimbo';
@@ -140,6 +179,7 @@ export default function CompanyScannerPage() {
         };
         setLastResult(log);
         setLogs((l) => [log, ...l].slice(0, 30));
+        if (studentId) studentLockRef.current.set(studentId, now);
         await refreshQueue();
         return;
       }
@@ -157,14 +197,24 @@ export default function CompanyScannerPage() {
             r.status === 'accepted'
               ? 'Carimbo concedido!'
               : r.status === 'duplicate'
-                ? 'Ja carimbado anteriormente'
+                ? 'Aluno ja possui este carimbo'
                 : r.reason ?? 'Recusado',
           stampTitulo,
         };
         setLastResult(log);
         setLogs((l) => [log, ...l].slice(0, 30));
+        if (studentId && (r.status === 'accepted' || r.status === 'duplicate')) {
+          studentLockRef.current.set(studentId, now);
+        }
+        if (r.status === 'accepted') {
+          pausedUntilRef.current = now + PAUSE_AFTER_SUCCESS_MS;
+          setPaused(true);
+          window.setTimeout(() => setPaused(false), PAUSE_AFTER_SUCCESS_MS);
+        }
         if (navigator.vibrate) {
-          navigator.vibrate(r.status === 'accepted' ? 100 : [60, 60, 60]);
+          navigator.vibrate(
+            r.status === 'accepted' ? 120 : r.status === 'duplicate' ? 40 : [60, 60, 60],
+          );
         }
       } catch (e) {
         const msg = e instanceof ApiError ? e.message : (e as Error).message;
@@ -287,7 +337,7 @@ export default function CompanyScannerPage() {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-xl bg-black shadow-sm">
+      <div className="relative overflow-hidden rounded-xl bg-black shadow-sm">
         <video
           ref={videoRef}
           className={clsx('aspect-square w-full object-cover', !scanning && 'hidden')}
@@ -297,6 +347,12 @@ export default function CompanyScannerPage() {
         {!scanning && (
           <div className="flex aspect-square items-center justify-center bg-slate-900 text-slate-400">
             Camera desligada
+          </div>
+        )}
+        {scanning && paused && (
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-emerald-500/85 text-white">
+            <span className="text-6xl font-bold leading-none">✓</span>
+            <span className="text-sm font-semibold uppercase tracking-wide">Carimbo concedido</span>
           </div>
         )}
       </div>
