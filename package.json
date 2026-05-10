@@ -1,0 +1,24 @@
+{
+  "name": "eventpass",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma modular para organizacao de eventos com passaporte digital, QR scanner e gamificacao.",
+  "scripts": {
+    "shared:build": "pnpm --filter @eventpass/shared build",
+    "shared:dev": "pnpm --filter @eventpass/shared dev",
+    "dev": "pnpm shared:build && pnpm -r --parallel --filter \"./apps/*\" --filter @eventpass/shared dev",
+    "build": "pnpm shared:build && pnpm -r --filter \"./apps/*\" build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "db:up": "docker compose up -d postgres redis",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres redis",
+    "db:reset": "docker compose down -v && pnpm db:up"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

@@ -1,0 +1,13 @@
+# Normaliza todos os arquivos texto para LF no repo (e no working tree).
+# Evita conflitos de line ending entre Windows/macOS/Linux.
+* text=auto eol=lf
+
+# Arquivos binarios nao devem ser tocados.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary

@@ -1,0 +1,393 @@
+// ============================================================
+// EventPass - Schema Prisma
+// ------------------------------------------------------------
+// Modelo desenhado para suportar MULTIPLOS eventos com
+// FUNCIONALIDADES (modulos) ATIVAVEIS por evento via
+// Event.config (JSONB). Cada evento ativa apenas as features
+// (passport, qr_scan, feedback, dashboard, ...) que precisa.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------
+// Enums
+// ------------------------------------------------------------
+
+enum UserType {
+  ADMIN
+  COMPANY
+  STUDENT
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  RUNNING
+  CLOSED
+  ARCHIVED
+}
+
+enum EventMemberRole {
+  ADMIN
+  COMPANY_REP
+  STUDENT
+}
+
+enum StudentKind {
+  INTERNAL   // estudante cadastrado da instituicao organizadora (com matricula)
+  EXTERNAL   // visitante externo, sem matricula
+}
+
+enum MapLocationKind {
+  COMPANY_STAND  // stand de empresa expositora
+  THEATER        // auditorio / teatro com atividades agendadas
+  ROOM           // sala / laboratorio
+  AREA           // area livre (praca de alimentacao, credenciamento)
+  POI            // ponto de interesse (banheiro, cafe, entrada)
+  CUSTOM         // ponto livre configurado pelo organizador
+}
+
+// ------------------------------------------------------------
+// Users (identidade global, reaproveitada entre eventos)
+// ------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid(7))
+  nome         String
+  cpf          String   @unique
+  email        String?  @unique
+  matricula    String?  @unique   // somente estudantes internos (instituicao organizadora)
+  senhaHash    String?            // admins tem senha; estudantes autenticam por matricula+cpf
+  tipoPerfil   UserType
+  studentKind  StudentKind?       // preenchido quando tipoPerfil = STUDENT
+  linkedinUrl  String?
+  curriculoKey String?            // chave no S3 do PDF
+
+  ativo        Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  eventMembers          EventMember[]
+  companyResponsible    CompanyResponsible[]
+  progressos            StudentProgress[]      @relation("StudentOfProgress")
+  avaliacoes            Evaluation[]           @relation("StudentOfEvaluation")
+  auditLogs             AuditLog[]
+  activityRegistrations ActivityRegistration[]
+
+  @@index([tipoPerfil])
+  @@map("users")
+}
+
+// ------------------------------------------------------------
+// Events (cada evento tem seu proprio conjunto de modulos)
+// ------------------------------------------------------------
+
+model Event {
+  id          String      @id @default(uuid(7))
+  nome        String
+  slug        String      @unique
+  descricao   String?
+  status      EventStatus @default(DRAFT)
+  startsAt    DateTime
+  endsAt      DateTime
+
+  // ModuleRegistry: lista de modulos ativos + configuracao livre por modulo.
+  // Exemplo:
+  // {
+  //   "modules": ["passport", "qr_scan", "feedback", "dashboard_live", "exports_csv"],
+  //   "theme": { "primary": "#0057A3", "logoUrl": "..." },
+  //   "passport": { "requiredStamps": 6 },
+  //   "qr_scan":  { "tokenTtlSeconds": 30, "rotateEverySeconds": 20 }
+  // }
+  config      Json        @default("{}")
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  members       EventMember[]
+  companies     Company[]
+  stampConfigs  StampConfig[]
+  progressos    StudentProgress[]
+  avaliacoes    Evaluation[]
+  feedbackTpls  FeedbackTemplate[]
+  venueMap      VenueMap?
+  mapLocations  MapLocation[]
+  activities    Activity[]
+
+  @@index([status, startsAt])
+  @@map("events")
+}
+
+// Associacao N:N User <-> Event com papel CONTEXTUAL.
+// (um user pode ser admin em um evento e estudante em outro)
+model EventMember {
+  id        String          @id @default(uuid(7))
+  eventId   String
+  userId    String
+  role      EventMemberRole
+  createdAt DateTime        @default(now())
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId, role])
+  @@index([eventId, role])
+  @@map("event_members")
+}
+
+// ------------------------------------------------------------
+// Companies (empresas expositoras - vinculadas a UM evento)
+// ------------------------------------------------------------
+
+model Company {
+  id        String   @id @default(uuid(7))
+  eventId   String
+  nome      String
+  slug      String
+  logoKey   String?  // chave no S3
+  meta      Json     @default("{}") // livre para campos extras (stand, descricao, etc)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event          Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  responsibles   CompanyResponsible[]
+  stampsGranted  StudentProgress[]    @relation("CompanyOfProgress")
+  stampConfigs   StampConfig[]        @relation("EntidadeAutorizada")
+  avaliacoes     Evaluation[]
+  mapLocations   MapLocation[]
+
+  @@unique([eventId, slug])
+  @@index([eventId, ativo])
+  @@map("companies")
+}
+
+model CompanyResponsible {
+  id         String   @id @default(uuid(7))
+  companyId  String
+  userId     String
+  createdAt  DateTime @default(now())
+
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@map("company_responsibles")
+}
+
+// ------------------------------------------------------------
+// Passport / Stamps (modulo "passport")
+// ------------------------------------------------------------
+
+// Configuracao dos CAMPOS do passaporte daquele evento.
+// RN02: somente entidade_autorizada pode carimbar este item.
+model StampConfig {
+  id                   String   @id @default(uuid(7))
+  eventId              String
+  titulo               String
+  descricao            String?
+  ordem                Int      @default(0)
+  obrigatorio          Boolean  @default(true)
+
+  // Se null => qualquer empresa do evento pode carimbar.
+  // Se preenchido => somente esta empresa (RN02).
+  entidadeAutorizadaId String?
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  event                Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  entidadeAutorizada   Company?  @relation("EntidadeAutorizada", fields: [entidadeAutorizadaId], references: [id], onDelete: SetNull)
+  progressos           StudentProgress[]
+
+  @@index([eventId, ordem])
+  @@map("stamp_configs")
+}
+
+// RN01: unicidade por (student, stamp) - um aluno nao pode receber o mesmo carimbo 2x.
+model StudentProgress {
+  id                 String   @id @default(uuid(7))
+  eventId            String
+  studentId          String
+  stampConfigId      String
+  companyId          String   // quem assinou (auditoria)
+  feedbackRespondido Boolean  @default(false)
+  clientUuid         String?  @unique  // idempotency key para sync offline
+
+  dataConclusao      DateTime @default(now())
+  createdAt          DateTime @default(now())
+
+  event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  student     User         @relation("StudentOfProgress", fields: [studentId], references: [id], onDelete: Cascade)
+  stampConfig StampConfig  @relation(fields: [stampConfigId], references: [id], onDelete: Cascade)
+  company     Company      @relation("CompanyOfProgress", fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, stampConfigId])  // RN01
+  @@index([eventId, dataConclusao])
+  @@index([companyId])
+  @@map("student_progress")
+}
+
+// ------------------------------------------------------------
+// Feedback / Evaluations (modulo "feedback")
+// ------------------------------------------------------------
+
+// Template de perguntas (configuravel por evento OU por empresa).
+// schema = JSON Schema-ish: { questions: [{ id, type, label, options? }] }
+model FeedbackTemplate {
+  id        String   @id @default(uuid(7))
+  eventId   String
+  companyId String?  // null = template padrao do evento
+  schema    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, companyId])
+  @@map("feedback_templates")
+}
+
+model Evaluation {
+  id         String   @id @default(uuid(7))
+  eventId    String
+  studentId  String
+  companyId  String
+  nota       Int?     // 1-5 ou null se so usou respostas abertas
+  respostas  Json     // respostas livres no formato do FeedbackTemplate
+  createdAt  DateTime @default(now())
+
+  event    Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  student  User    @relation("StudentOfEvaluation", fields: [studentId], references: [id], onDelete: Cascade)
+  company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, companyId])  // um aluno avalia cada empresa 1x
+  @@index([eventId, companyId])
+  @@map("evaluations")
+}
+
+// ------------------------------------------------------------
+// Venue Map (modulo "venue_map")
+// Representacao do espaco fisico do evento com pins interativos.
+// Reutilizavel entre eventos: um VenueMap por evento, N locations.
+// ------------------------------------------------------------
+
+model VenueMap {
+  id             String   @id @default(uuid(7))
+  eventId        String   @unique
+  titulo         String?            // ex: "Pavilhao Central", "Bloco K"
+  // Fundo: URL direta de uma imagem (planta baixa, render) OU null para
+  // usar o fundo procedural (grade + ruido) do componente.
+  backgroundUrl  String?
+  viewportWidth  Int      @default(1200)
+  viewportHeight Int      @default(800)
+  // Theme livre: { accent, gridOn, noiseOn } etc.
+  theme          Json     @default("{}")
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  event          Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  locations      MapLocation[]
+
+  @@map("venue_maps")
+}
+
+model MapLocation {
+  id          String          @id @default(uuid(7))
+  venueMapId  String
+  eventId     String           // denormalizado para consultas simples
+  kind        MapLocationKind
+  companyId   String?          // preenchido quando kind = COMPANY_STAND
+
+  titulo      String
+  descricao   String?
+  corHex      String?          // override de cor (ex: marca da empresa)
+  icone       String?          // glifo/emoji curto
+  // Coordenadas em PORCENTAGEM (0-100) do viewport do mapa.
+  x           Float
+  y           Float
+  // Retangulos de sala/teatro: opcional. Se null renderiza como pin.
+  larguraPct  Float?
+  alturaPct   Float?
+  rotacaoDeg  Int             @default(0)
+  ordem       Int             @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  venueMap    VenueMap @relation(fields: [venueMapId], references: [id], onDelete: Cascade)
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  activities  Activity[]
+
+  @@index([venueMapId, kind])
+  @@index([eventId, kind])
+  @@map("map_locations")
+}
+
+model Activity {
+  id                String   @id @default(uuid(7))
+  eventId           String
+  locationId        String
+  titulo            String
+  descricao         String?
+  palestrante       String?
+  startsAt          DateTime
+  endsAt            DateTime
+  capacidade        Int?
+  permitirInscricao Boolean  @default(true)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  event         Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  location      MapLocation            @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  registrations ActivityRegistration[]
+
+  @@index([eventId, startsAt])
+  @@index([locationId, startsAt])
+  @@map("activities")
+}
+
+model ActivityRegistration {
+  id         String   @id @default(uuid(7))
+  activityId String
+  userId     String
+  createdAt  DateTime @default(now())
+
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, userId])
+  @@index([userId])
+  @@map("activity_registrations")
+}
+
+// ------------------------------------------------------------
+// Audit Log (seguranca / compliance)
+// ------------------------------------------------------------
+
+model AuditLog {
+  id        String   @id @default(uuid(7))
+  actorId   String?
+  action    String
+  target    String?
+  metadata  Json     @default("{}")
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
