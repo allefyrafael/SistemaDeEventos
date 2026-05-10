@@ -7,6 +7,36 @@ import type {
 } from '@eventpass/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 
+interface StampWithCompanies {
+  id: string;
+  eventId: string;
+  titulo: string;
+  descricao: string | null;
+  ordem: number;
+  obrigatorio: boolean;
+  authorizedCompanies: Array<{
+    company: { id: string; nome: string };
+  }>;
+}
+
+function toDto(s: StampWithCompanies): StampConfigDto {
+  const companies = s.authorizedCompanies.map((ac) => ({
+    id: ac.company.id,
+    nome: ac.company.nome,
+  }));
+  return {
+    id: s.id,
+    eventId: s.eventId,
+    titulo: s.titulo,
+    descricao: s.descricao,
+    ordem: s.ordem,
+    obrigatorio: s.obrigatorio,
+    authorizedCompanies: companies,
+    // Compat: primeira empresa autorizada como `entidadeAutorizada`.
+    entidadeAutorizada: companies.length > 0 ? companies[0] : null,
+  };
+}
+
 @Injectable()
 export class PassportService {
   constructor(private readonly prisma: PrismaService) {}
@@ -18,20 +48,14 @@ export class PassportService {
   async listStamps(eventId: string): Promise<StampConfigDto[]> {
     const rows = await this.prisma.stampConfig.findMany({
       where: { eventId },
-      include: { entidadeAutorizada: true },
+      include: {
+        authorizedCompanies: {
+          include: { company: { select: { id: true, nome: true } } },
+        },
+      },
       orderBy: [{ ordem: 'asc' }, { createdAt: 'asc' }],
     });
-    return rows.map((r) => ({
-      id: r.id,
-      eventId: r.eventId,
-      titulo: r.titulo,
-      descricao: r.descricao,
-      ordem: r.ordem,
-      obrigatorio: r.obrigatorio,
-      entidadeAutorizada: r.entidadeAutorizada
-        ? { id: r.entidadeAutorizada.id, nome: r.entidadeAutorizada.nome }
-        : null,
-    }));
+    return rows.map(toDto);
   }
 
   async createStamp(
@@ -39,9 +63,11 @@ export class PassportService {
     input: StampConfigCreateInput,
   ): Promise<StampConfigDto> {
     await this.assertEventExists(eventId);
-    if (input.entidadeAutorizadaId) {
-      await this.assertCompanyBelongsToEvent(eventId, input.entidadeAutorizadaId);
+    const companyIds = this.resolveCompanyIds(input);
+    if (companyIds.length > 0) {
+      await this.assertCompaniesBelongToEvent(eventId, companyIds);
     }
+
     const row = await this.prisma.stampConfig.create({
       data: {
         eventId,
@@ -49,21 +75,17 @@ export class PassportService {
         descricao: input.descricao,
         ordem: input.ordem ?? 0,
         obrigatorio: input.obrigatorio ?? true,
-        entidadeAutorizadaId: input.entidadeAutorizadaId ?? null,
+        authorizedCompanies: {
+          create: companyIds.map((companyId) => ({ companyId })),
+        },
       },
-      include: { entidadeAutorizada: true },
+      include: {
+        authorizedCompanies: {
+          include: { company: { select: { id: true, nome: true } } },
+        },
+      },
     });
-    return {
-      id: row.id,
-      eventId: row.eventId,
-      titulo: row.titulo,
-      descricao: row.descricao,
-      ordem: row.ordem,
-      obrigatorio: row.obrigatorio,
-      entidadeAutorizada: row.entidadeAutorizada
-        ? { id: row.entidadeAutorizada.id, nome: row.entidadeAutorizada.nome }
-        : null,
-    };
+    return toDto(row);
   }
 
   async updateStamp(
@@ -75,34 +97,48 @@ export class PassportService {
       where: { id: stampId, eventId },
     });
     if (!current) throw new NotFoundException('Stamp nao encontrado');
-    if (input.entidadeAutorizadaId !== undefined && input.entidadeAutorizadaId !== null) {
-      await this.assertCompanyBelongsToEvent(eventId, input.entidadeAutorizadaId);
+
+    // Atualiza authorizedCompanies somente se um dos campos foi enviado.
+    const companyIdsProvided =
+      input.authorizedCompanyIds !== undefined ||
+      input.entidadeAutorizadaId !== undefined;
+    let companyIds: string[] | null = null;
+    if (companyIdsProvided) {
+      companyIds = this.resolveCompanyIds(input);
+      if (companyIds.length > 0) {
+        await this.assertCompaniesBelongToEvent(eventId, companyIds);
+      }
     }
-    const row = await this.prisma.stampConfig.update({
-      where: { id: stampId },
-      data: {
-        titulo: input.titulo ?? undefined,
-        descricao: input.descricao ?? undefined,
-        ordem: input.ordem ?? undefined,
-        obrigatorio: input.obrigatorio ?? undefined,
-        entidadeAutorizadaId:
-          input.entidadeAutorizadaId === undefined
-            ? undefined
-            : input.entidadeAutorizadaId,
-      },
-      include: { entidadeAutorizada: true },
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.stampConfig.update({
+        where: { id: stampId },
+        data: {
+          titulo: input.titulo ?? undefined,
+          descricao: input.descricao ?? undefined,
+          ordem: input.ordem ?? undefined,
+          obrigatorio: input.obrigatorio ?? undefined,
+        },
+      });
+      if (companyIds !== null) {
+        await tx.stampConfigCompany.deleteMany({ where: { stampConfigId: stampId } });
+        if (companyIds.length > 0) {
+          await tx.stampConfigCompany.createMany({
+            data: companyIds.map((companyId) => ({ stampConfigId: stampId, companyId })),
+          });
+        }
+      }
     });
-    return {
-      id: row.id,
-      eventId: row.eventId,
-      titulo: row.titulo,
-      descricao: row.descricao,
-      ordem: row.ordem,
-      obrigatorio: row.obrigatorio,
-      entidadeAutorizada: row.entidadeAutorizada
-        ? { id: row.entidadeAutorizada.id, nome: row.entidadeAutorizada.nome }
-        : null,
-    };
+
+    const row = await this.prisma.stampConfig.findUniqueOrThrow({
+      where: { id: stampId },
+      include: {
+        authorizedCompanies: {
+          include: { company: { select: { id: true, nome: true } } },
+        },
+      },
+    });
+    return toDto(row);
   }
 
   async removeStamp(eventId: string, stampId: string): Promise<void> {
@@ -166,6 +202,23 @@ export class PassportService {
   // Helpers
   // -------------------------------------------------------
 
+  /**
+   * Resolve a lista final de companies autorizadas a partir do input.
+   * Aceita o campo novo `authorizedCompanyIds` e cai no legado
+   * `entidadeAutorizadaId` (1:1) para clientes antigos.
+   */
+  private resolveCompanyIds(
+    input: { authorizedCompanyIds?: string[]; entidadeAutorizadaId?: string | null },
+  ): string[] {
+    if (input.authorizedCompanyIds !== undefined) {
+      return Array.from(new Set(input.authorizedCompanyIds));
+    }
+    if (input.entidadeAutorizadaId) {
+      return [input.entidadeAutorizadaId];
+    }
+    return [];
+  }
+
   private async assertEventExists(eventId: string): Promise<void> {
     const ok = await this.prisma.event.findUnique({
       where: { id: eventId },
@@ -174,14 +227,15 @@ export class PassportService {
     if (!ok) throw new NotFoundException('Evento nao encontrado');
   }
 
-  private async assertCompanyBelongsToEvent(
+  private async assertCompaniesBelongToEvent(
     eventId: string,
-    companyId: string,
+    companyIds: string[],
   ): Promise<void> {
-    const ok = await this.prisma.company.findFirst({
-      where: { id: companyId, eventId },
-      select: { id: true },
+    const found = await this.prisma.company.count({
+      where: { eventId, id: { in: companyIds } },
     });
-    if (!ok) throw new NotFoundException('Empresa nao pertence a este evento');
+    if (found !== companyIds.length) {
+      throw new NotFoundException('Uma ou mais empresas nao pertencem a este evento');
+    }
   }
 }

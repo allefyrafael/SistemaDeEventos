@@ -5,7 +5,12 @@ export const stampConfigCreateSchema = z.object({
   descricao: z.string().max(300).optional(),
   ordem: z.number().int().min(0).default(0),
   obrigatorio: z.boolean().default(true),
-  // Se null => qualquer empresa pode carimbar. Se preenchido => RN02.
+  // RN02: lista de empresas autorizadas a carimbar este item.
+  // Vazio (ou omitido) = qualquer empresa do evento pode carimbar.
+  // Quando ha 1+ ids, somente essas empresas podem (helps explorar areas).
+  authorizedCompanyIds: z.array(z.string().uuid()).optional(),
+  // LEGADO (1:1) — aceita por retrocompat. Quando enviado e
+  // authorizedCompanyIds esta omitido, e tratado como [valor].
   entidadeAutorizadaId: z.string().uuid().nullable().optional(),
 });
 export type StampConfigCreateInput = z.infer<typeof stampConfigCreateSchema>;
@@ -20,6 +25,12 @@ export const stampConfigDtoSchema = z.object({
   descricao: z.string().nullable(),
   ordem: z.number().int(),
   obrigatorio: z.boolean(),
+  // Lista das empresas autorizadas (RN02). Vazia = qualquer empresa pode.
+  authorizedCompanies: z.array(
+    z.object({ id: z.string().uuid(), nome: z.string() }),
+  ),
+  // LEGADO: primeira empresa autorizada (compat com codigo antigo). Sera
+  // removido em uma versao futura.
   entidadeAutorizada: z
     .object({ id: z.string().uuid(), nome: z.string() })
     .nullable(),

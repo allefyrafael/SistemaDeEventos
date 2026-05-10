@@ -138,12 +138,17 @@ async function main() {
   }
   console.log('empresas criadas:', createdCompanies.map((c) => c.nome).join(', '));
 
-  // 4) 3 stamps (2 livres + 1 exclusivo Carreiras Hub)
+  // 4) 3 stamps demo (2 livres + 1 restrito a uma empresa especifica via
+  // a tabela junção StampConfigCompany).
   const carreirasHub = createdCompanies.find((c) => c.nome === 'Carreiras Hub');
   const stampsData = [
-    { titulo: 'Visita Empresa A', ordem: 1, entidadeAutorizadaId: null as string | null },
-    { titulo: 'Visita Empresa B', ordem: 2, entidadeAutorizadaId: null as string | null },
-    { titulo: 'Carreiras Hub', ordem: 3, entidadeAutorizadaId: carreirasHub?.id ?? null },
+    { titulo: 'Visita Empresa A', ordem: 1, authorizedCompanyIds: [] as string[] },
+    { titulo: 'Visita Empresa B', ordem: 2, authorizedCompanyIds: [] as string[] },
+    {
+      titulo: 'Carreiras Hub',
+      ordem: 3,
+      authorizedCompanyIds: carreirasHub ? [carreirasHub.id] : [],
+    },
   ];
   for (const s of stampsData) {
     const exists = await prisma.stampConfig.findFirst({
@@ -156,7 +161,9 @@ async function main() {
           titulo: s.titulo,
           ordem: s.ordem,
           obrigatorio: true,
-          entidadeAutorizadaId: s.entidadeAutorizadaId,
+          authorizedCompanies: {
+            create: s.authorizedCompanyIds.map((companyId) => ({ companyId })),
+          },
         },
       });
     }

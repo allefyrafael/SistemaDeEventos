@@ -31,10 +31,6 @@ export default function EventStampsPage() {
     setCompanies(comps);
   }
 
-  useEffect(() => {
-    void load();
-  }, [event]);
-
   async function remove(s: StampConfigDto) {
     if (!event) return;
     if (!confirm(`Excluir carimbo "${s.titulo}"?`)) return;
@@ -46,6 +42,10 @@ export default function EventStampsPage() {
     }
   }
 
+  useEffect(() => {
+    void load();
+  }, [event]);
+
   if (!event) return null;
 
   return (
@@ -54,8 +54,9 @@ export default function EventStampsPage() {
         <div>
           <h2 className="text-xl font-bold text-slate-900">Carimbos</h2>
           <p className="text-sm text-slate-500">
-            Defina os itens do passaporte. Itens obrigatorios sao usados para calcular
-            concludentes (RN03).
+            Defina os itens do passaporte. Para cada item, escolha quais
+            empresas podem carimba-lo (RN02). Itens obrigatorios contam para
+            calcular concludentes (RN03).
           </p>
         </div>
         <Button onClick={() => setCreating(true)}>+ Novo carimbo</Button>
@@ -101,7 +102,7 @@ export default function EventStampsPage() {
               key={s.id}
               className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
             >
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-900">
                   #{s.ordem + 1} · {s.titulo}
                   {s.obrigatorio && (
@@ -111,10 +112,20 @@ export default function EventStampsPage() {
                   )}
                 </p>
                 {s.descricao && <p className="text-xs text-slate-500">{s.descricao}</p>}
-                <p className="text-xs text-slate-500">
-                  {s.entidadeAutorizada
-                    ? `Somente ${s.entidadeAutorizada.nome} pode carimbar (RN02)`
-                    : 'Qualquer empresa pode carimbar'}
+                <p className="mt-1 text-xs text-slate-500">
+                  {s.authorizedCompanies.length === 0 ? (
+                    <span className="text-slate-500">
+                      Qualquer empresa pode carimbar
+                    </span>
+                  ) : (
+                    <span>
+                      So{' '}
+                      <span className="font-semibold text-slate-700">
+                        {s.authorizedCompanies.map((c) => c.nome).join(', ')}
+                      </span>{' '}
+                      pode carimbar (RN02)
+                    </span>
+                  )}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -158,22 +169,35 @@ function StampForm({
   const [descricao, setDescricao] = useState(initial?.descricao ?? '');
   const [ordem, setOrdem] = useState(initial?.ordem ?? 0);
   const [obrigatorio, setObrigatorio] = useState(initial?.obrigatorio ?? true);
-  const [entidade, setEntidade] = useState<string>(
-    initial?.entidadeAutorizada?.id ?? '',
+  const [authorizedIds, setAuthorizedIds] = useState<Set<string>>(
+    () => new Set(initial?.authorizedCompanies.map((c) => c.id) ?? []),
   );
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  function toggleCompany(id: string) {
+    setAuthorizedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   async function submit() {
     setErr(null);
+    if (!titulo.trim()) {
+      setErr('Informe o titulo');
+      return;
+    }
     setSaving(true);
     try {
       const body = {
-        titulo,
+        titulo: titulo.trim(),
         descricao: descricao || undefined,
         ordem: Number(ordem),
         obrigatorio,
-        entidadeAutorizadaId: entidade || null,
+        authorizedCompanyIds: Array.from(authorizedIds),
       };
       if (initial) {
         await api(`/events/${eventId}/passport/stamps/${initial.id}`, {
@@ -199,7 +223,12 @@ function StampForm({
       <h3 className="text-lg font-bold text-slate-900">
         {initial ? 'Editar carimbo' : 'Novo carimbo'}
       </h3>
-      {err && <div className="mt-3"><ErrorBanner>{err}</ErrorBanner></div>}
+      {err && (
+        <div className="mt-3">
+          <ErrorBanner>{err}</ErrorBanner>
+        </div>
+      )}
+
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         <Field label="Titulo">
           <TextInput value={titulo} onChange={(e) => setTitulo(e.target.value)} />
@@ -221,30 +250,54 @@ function StampForm({
             />
           </Field>
         </div>
-        <Field label="Entidade autorizada" hint="Deixe vazio para permitir qualquer empresa">
-          <select
-            value={entidade}
-            onChange={(e) => setEntidade(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base focus:border-brand-primary focus:outline-none"
-          >
-            <option value="">— Qualquer empresa —</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nome}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <label className="flex items-center gap-3 text-sm text-slate-700">
+
+        <div className="md:col-span-2">
+          <p className="text-sm font-medium text-slate-700">Empresas autorizadas</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Marque as empresas que podem conceder este carimbo. Deixe vazio
+            para permitir que QUALQUER empresa do evento carimbe (util para
+            visitas livres).
+          </p>
+          {companies.length === 0 ? (
+            <p className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs text-slate-500">
+              Nenhuma empresa cadastrada neste evento ainda. Cadastre na aba
+              Empresas para poder restringir.
+            </p>
+          ) : (
+            <ul className="mt-2 grid max-h-48 grid-cols-1 gap-1 overflow-y-auto rounded-lg border border-slate-200 p-2 sm:grid-cols-2">
+              {companies.map((c) => (
+                <li key={c.id}>
+                  <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm text-slate-700 hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={authorizedIds.has(c.id)}
+                      onChange={() => toggleCompany(c.id)}
+                      className="h-4 w-4 rounded border-slate-300 text-brand-primary focus:ring-brand-primary"
+                    />
+                    <span className="truncate">{c.nome}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-xs text-slate-500">
+            {authorizedIds.size === 0
+              ? 'Qualquer empresa pode carimbar este item.'
+              : `${authorizedIds.size} empresa(s) selecionada(s).`}
+          </p>
+        </div>
+
+        <label className="flex items-center gap-3 text-sm text-slate-700 md:col-span-2">
           <input
             type="checkbox"
             checked={obrigatorio}
             onChange={(e) => setObrigatorio(e.target.checked)}
             className="h-4 w-4"
           />
-          Obrigatorio (conta para certificado)
+          Obrigatorio (conta para certificado de concludente)
         </label>
       </div>
+
       <div className="mt-5 flex gap-2">
         <Button onClick={submit} disabled={saving}>
           {saving ? 'Salvando...' : 'Salvar'}

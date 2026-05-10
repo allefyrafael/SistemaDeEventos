@@ -150,14 +150,17 @@ export class ScanService {
       companyId = myCompanies[0].id;
     }
 
-    // 4) Valida stamp configurado
+    // 4) Valida stamp configurado (com lista de empresas autorizadas)
     const stamp = await this.prisma.stampConfig.findFirst({
       where: { id: input.stampConfigId, eventId },
+      include: { authorizedCompanies: { select: { companyId: true } } },
     });
     if (!stamp) throw new NotFoundException('Stamp nao encontrado');
 
-    // RN02: permissao de carimbo
-    if (stamp.entidadeAutorizadaId && stamp.entidadeAutorizadaId !== companyId) {
+    // RN02: se ha empresas autorizadas, a company atual precisa estar na
+    // lista. Lista vazia = qualquer empresa do evento pode carimbar.
+    const allowedCompanyIds = stamp.authorizedCompanies.map((a) => a.companyId);
+    if (allowedCompanyIds.length > 0 && !allowedCompanyIds.includes(companyId)) {
       return {
         status: 'rejected',
         reason: 'Esta empresa nao pode carimbar este item (RN02)',
@@ -289,24 +292,34 @@ export class ScanService {
   /**
    * Lista os stamps que o usuario logado pode conceder neste evento.
    * - ADMIN: todos os stamps do evento (scanner geral do organizador).
-   * - COMPANY: apenas stamps livres OU vinculados a uma de suas empresas.
+   * - COMPANY: stamps sem restricao OU com a propria company autorizada
+   *   na junction StampConfigCompany.
    */
   async listStampsCompanyCanGrant(
     eventId: string,
     actor: { id: string; tipoPerfil: UserType },
   ) {
+    const baseSelect = {
+      id: true,
+      titulo: true,
+      descricao: true,
+      ordem: true,
+      authorizedCompanies: { select: { companyId: true } },
+    } as const;
+
     if (actor.tipoPerfil === UserType.ADMIN) {
-      return this.prisma.stampConfig.findMany({
+      const rows = await this.prisma.stampConfig.findMany({
         where: { eventId },
         orderBy: [{ ordem: 'asc' }, { createdAt: 'asc' }],
-        select: {
-          id: true,
-          titulo: true,
-          descricao: true,
-          ordem: true,
-          entidadeAutorizadaId: true,
-        },
+        select: baseSelect,
       });
+      return rows.map((r) => ({
+        id: r.id,
+        titulo: r.titulo,
+        descricao: r.descricao,
+        ordem: r.ordem,
+        authorizedCompanyIds: r.authorizedCompanies.map((a) => a.companyId),
+      }));
     }
 
     const myCompanies = await this.prisma.company.findMany({
@@ -315,19 +328,26 @@ export class ScanService {
     });
     if (myCompanies.length === 0) return [];
     const companyIds = myCompanies.map((c) => c.id);
-    return this.prisma.stampConfig.findMany({
+
+    const rows = await this.prisma.stampConfig.findMany({
       where: {
         eventId,
-        OR: [{ entidadeAutorizadaId: null }, { entidadeAutorizadaId: { in: companyIds } }],
+        OR: [
+          // Sem nenhuma empresa autorizada = livre.
+          { authorizedCompanies: { none: {} } },
+          // Tem alguma empresa que pertence ao user.
+          { authorizedCompanies: { some: { companyId: { in: companyIds } } } },
+        ],
       },
       orderBy: [{ ordem: 'asc' }, { createdAt: 'asc' }],
-      select: {
-        id: true,
-        titulo: true,
-        descricao: true,
-        ordem: true,
-        entidadeAutorizadaId: true,
-      },
+      select: baseSelect,
     });
+    return rows.map((r) => ({
+      id: r.id,
+      titulo: r.titulo,
+      descricao: r.descricao,
+      ordem: r.ordem,
+      authorizedCompanyIds: r.authorizedCompanies.map((a) => a.companyId),
+    }));
   }
 }

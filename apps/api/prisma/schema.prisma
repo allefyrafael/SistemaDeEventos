@@ -157,12 +157,13 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  event          Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  responsibles   CompanyResponsible[]
-  stampsGranted  StudentProgress[]    @relation("CompanyOfProgress")
-  stampConfigs   StampConfig[]        @relation("EntidadeAutorizada")
-  avaliacoes     Evaluation[]
-  mapLocations   MapLocation[]
+  event              Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  responsibles       CompanyResponsible[]
+  stampsGranted      StudentProgress[]    @relation("CompanyOfProgress")
+  stampConfigs       StampConfig[]        @relation("EntidadeAutorizada")  // legado (1:1)
+  authorizedStamps   StampConfigCompany[] @relation("AuthorizedStampForCompany")
+  avaliacoes         Evaluation[]
+  mapLocations       MapLocation[]
 
   @@unique([eventId, slug])
   @@index([eventId, ativo])
@@ -187,7 +188,11 @@ model CompanyResponsible {
 // ------------------------------------------------------------
 
 // Configuracao dos CAMPOS do passaporte daquele evento.
-// RN02: somente entidade_autorizada pode carimbar este item.
+// RN02 (atual): se o stamp tem registros em StampConfigCompany, somente
+// essas empresas podem carimba-lo; caso contrario, qualquer empresa do
+// evento pode. O campo `entidadeAutorizadaId` e LEGADO (relacao 1:1) e
+// foi migrado para a tabela junção StampConfigCompany — mantido apenas
+// para backfill historico, nao e mais consultado pelo backend.
 model StampConfig {
   id                   String   @id @default(uuid(7))
   eventId              String
@@ -196,8 +201,7 @@ model StampConfig {
   ordem                Int      @default(0)
   obrigatorio          Boolean  @default(true)
 
-  // Se null => qualquer empresa do evento pode carimbar.
-  // Se preenchido => somente esta empresa (RN02).
+  // LEGADO: nao usar. Use StampConfigCompany abaixo.
   entidadeAutorizadaId String?
 
   createdAt            DateTime @default(now())
@@ -206,9 +210,25 @@ model StampConfig {
   event                Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
   entidadeAutorizada   Company?  @relation("EntidadeAutorizada", fields: [entidadeAutorizadaId], references: [id], onDelete: SetNull)
   progressos           StudentProgress[]
+  authorizedCompanies  StampConfigCompany[]
 
   @@index([eventId, ordem])
   @@map("stamp_configs")
+}
+
+// Tabela junção N:M — quais empresas estao autorizadas a carimbar
+// determinado stamp. Vazio = qualquer empresa do evento pode.
+model StampConfigCompany {
+  stampConfigId String
+  companyId     String
+  createdAt     DateTime @default(now())
+
+  stampConfig   StampConfig @relation(fields: [stampConfigId], references: [id], onDelete: Cascade)
+  company       Company     @relation("AuthorizedStampForCompany", fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@id([stampConfigId, companyId])
+  @@index([companyId])
+  @@map("stamp_config_companies")
 }
 
 // RN01: unicidade por (student, stamp) - um aluno nao pode receber o mesmo carimbo 2x.

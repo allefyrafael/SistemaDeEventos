@@ -22,7 +22,7 @@ interface Stamp {
   id: string;
   titulo: string;
   ordem: number;
-  entidadeAutorizadaId: string | null;
+  authorizedCompanyIds: string[];
 }
 
 interface ScanResp {
@@ -99,12 +99,13 @@ export default function AdminScannerPage() {
     })();
   }, [event, companyId, stampId]);
 
-  // Stamps com entidadeAutorizada filtram quais empresas podem concede-los.
-  // Mostramos isso na UI pra evitar erro no submit.
+  // Stamps com lista de empresas autorizadas filtram quem pode concede-los.
+  // Mostramos isso na UI pra evitar erro no submit (RN02).
   const stampSelected = stamps.find((s) => s.id === stampId);
-  const stampLocksToCompany = stampSelected?.entidadeAutorizadaId ?? null;
+  const stampHasRestriction =
+    !!stampSelected && stampSelected.authorizedCompanyIds.length > 0;
   const stampInvalidForCompany =
-    stampLocksToCompany !== null && stampLocksToCompany !== companyId;
+    stampHasRestriction && !stampSelected!.authorizedCompanyIds.includes(companyId);
 
   const handleDecoded = useCallback(
     async (token: string) => {
@@ -272,7 +273,7 @@ export default function AdminScannerPage() {
             {stamps.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.titulo}
-                {s.entidadeAutorizadaId ? ' (exclusivo)' : ''}
+                {s.authorizedCompanyIds.length > 0 ? ' (restrito)' : ''}
               </option>
             ))}
           </select>
