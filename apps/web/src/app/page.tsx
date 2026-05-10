@@ -27,7 +27,7 @@ export default function HomePage() {
           className="rounded-xl bg-brand-primary px-4 py-4 text-center font-semibold text-white shadow-sm active:scale-[0.98]"
           href="/login/estudante"
         >
-          Sou estudante
+          Sou participante
         </Link>
         <Link
           className="rounded-xl border-2 border-brand-primary px-4 py-4 text-center font-semibold text-brand-primary active:scale-[0.98]"
@@ -40,6 +40,12 @@ export default function HomePage() {
           href="/login/admin"
         >
           Sou administrador
+        </Link>
+        <Link
+          className="text-center text-sm font-medium text-slate-500 underline-offset-2 hover:underline"
+          href="/cadastro/visitante"
+        >
+          Visitante externo? Crie seu cadastro
         </Link>
       </div>
       <p className="text-center text-xs text-slate-400">

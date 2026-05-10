@@ -125,6 +125,33 @@ export class EventsService {
     return rows.map((r) => this.toDetail(r));
   }
 
+  /**
+   * Lista publica (sem auth) usada no auto-cadastro de visitantes externos.
+   * Retorna apenas eventos PUBLISHED ou RUNNING, com campos seguros.
+   */
+  async listPublic() {
+    const rows = await this.prisma.event.findMany({
+      where: { status: { in: [EventStatus.PUBLISHED, EventStatus.RUNNING] } },
+      orderBy: { startsAt: 'asc' },
+      select: {
+        id: true,
+        nome: true,
+        slug: true,
+        descricao: true,
+        startsAt: true,
+        endsAt: true,
+      },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      nome: r.nome,
+      slug: r.slug,
+      descricao: r.descricao,
+      startsAt: r.startsAt.toISOString(),
+      endsAt: r.endsAt.toISOString(),
+    }));
+  }
+
   async toggleModule(
     eventId: string,
     module: FeatureModule,

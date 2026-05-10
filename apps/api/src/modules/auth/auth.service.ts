@@ -1,10 +1,13 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { EventMemberRole, EventStatus, StudentKind, UserType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'node:crypto';
 
@@ -15,6 +18,8 @@ import type {
   AdminLoginInput,
   CompanyLoginInput,
   StudentLoginInput,
+  VisitorLoginInput,
+  VisitorRegisterInput,
 } from '@eventpass/shared';
 import type {
   AuthenticatedUser,
@@ -97,7 +102,7 @@ export class AuthService {
   }
 
   /**
-   * Estudante interno: matricula + CPF. Externo cadastra-se por outro fluxo.
+   * Estudante interno: matricula + CPF. Externo usa registerVisitor/loginVisitor.
    */
   async loginStudent(input: StudentLoginInput): Promise<LoginResponse> {
     const user = await this.prisma.user.findFirst({
@@ -110,6 +115,90 @@ export class AuthService {
     });
     if (!user) throw new UnauthorizedException('Matricula ou CPF invalido');
 
+    return this.issueTokens(user.id, 'STUDENT', user.nome);
+  }
+
+  /**
+   * Auto-cadastro de visitante externo (sem matricula). Cria o User como
+   * STUDENT/EXTERNAL com senha bcrypt e associa ao evento alvo. Idempotente:
+   * se o CPF ja for visitante, atualiza dados e garante a associacao.
+   */
+  async registerVisitor(input: VisitorRegisterInput): Promise<LoginResponse> {
+    const event = await this.prisma.event.findUnique({ where: { id: input.eventId } });
+    if (!event) throw new NotFoundException('Evento nao encontrado');
+    if (event.status !== EventStatus.PUBLISHED && event.status !== EventStatus.RUNNING) {
+      throw new ForbiddenException('Evento nao esta aceitando cadastros');
+    }
+
+    const existing = await this.prisma.user.findUnique({ where: { cpf: input.cpf } });
+    const senhaHash = await this.hashPassword(input.senha);
+
+    let userId: string;
+    let userNome: string;
+
+    if (existing) {
+      if (existing.tipoPerfil !== UserType.STUDENT) {
+        throw new ConflictException('CPF ja cadastrado com outro perfil');
+      }
+      if (existing.studentKind !== StudentKind.EXTERNAL) {
+        // Evita que estudante INTERNAL (com matricula) sobrescreva o cadastro
+        // pela rota de visitante.
+        throw new ConflictException('CPF ja cadastrado como estudante interno');
+      }
+      // Re-registro: atualiza nome/email/senha e segue para garantir associacao.
+      const updated = await this.prisma.user.update({
+        where: { id: existing.id },
+        data: { nome: input.nome, email: input.email, senhaHash },
+      });
+      userId = updated.id;
+      userNome = updated.nome;
+    } else {
+      const created = await this.prisma.user.create({
+        data: {
+          nome: input.nome,
+          cpf: input.cpf,
+          email: input.email,
+          senhaHash,
+          tipoPerfil: UserType.STUDENT,
+          studentKind: StudentKind.EXTERNAL,
+        },
+      });
+      userId = created.id;
+      userNome = created.nome;
+    }
+
+    await this.prisma.eventMember.upsert({
+      where: {
+        eventId_userId_role: {
+          eventId: event.id,
+          userId,
+          role: EventMemberRole.STUDENT,
+        },
+      },
+      update: {},
+      create: { eventId: event.id, userId, role: EventMemberRole.STUDENT },
+    });
+
+    return this.issueTokens(userId, 'STUDENT', userNome);
+  }
+
+  /**
+   * Login de visitante externo: CPF + senha. So permite login para usuarios
+   * que se auto-cadastraram (studentKind = EXTERNAL e tem senhaHash).
+   */
+  async loginVisitor(input: VisitorLoginInput): Promise<LoginResponse> {
+    const user = await this.prisma.user.findUnique({ where: { cpf: input.cpf } });
+    if (
+      !user ||
+      !user.ativo ||
+      user.tipoPerfil !== UserType.STUDENT ||
+      user.studentKind !== StudentKind.EXTERNAL ||
+      !user.senhaHash
+    ) {
+      throw new UnauthorizedException('CPF ou senha invalidos');
+    }
+    const ok = await bcrypt.compare(input.senha, user.senhaHash);
+    if (!ok) throw new UnauthorizedException('CPF ou senha invalidos');
     return this.issueTokens(user.id, 'STUDENT', user.nome);
   }
 

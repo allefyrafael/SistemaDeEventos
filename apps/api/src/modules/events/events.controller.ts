@@ -23,6 +23,7 @@ import { z } from 'zod';
 import { EventMembershipService } from '../../core/event-membership/event-membership.service';
 import { ZodValidationPipe } from '../../core/pipes/zod-validation.pipe';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { EventsService } from './events.service';
@@ -38,6 +39,14 @@ export class EventsController {
     private readonly events: EventsService,
     private readonly membership: EventMembershipService,
   ) {}
+
+  // Lista publica (sem auth) usada na tela de auto-cadastro de visitantes.
+  // So eventos PUBLISHED ou RUNNING.
+  @Public()
+  @Get('public')
+  listPublic() {
+    return this.events.listPublic();
+  }
 
   // ADMIN ve todos; COMPANY/STUDENT veem apenas em que sao membros.
   @Get()

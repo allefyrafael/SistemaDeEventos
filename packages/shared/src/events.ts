@@ -253,3 +253,15 @@ export const eventSummarySchema = z.object({
   modules: z.array(z.enum(FEATURE_MODULES)),
 });
 export type EventSummary = z.infer<typeof eventSummarySchema>;
+
+// Versao publica (sem auth) usada na tela de auto-cadastro de visitantes:
+// expoe somente eventos PUBLISHED ou RUNNING e campos seguros.
+export const publicEventSchema = z.object({
+  id: z.string(),
+  nome: z.string(),
+  slug: z.string(),
+  descricao: z.string().nullable(),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+});
+export type PublicEvent = z.infer<typeof publicEventSchema>;

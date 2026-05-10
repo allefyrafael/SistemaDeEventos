@@ -18,6 +18,14 @@ interface AuthContextValue {
   loginAdmin: (cpf: string, senha: string) => Promise<AuthUser>;
   loginCompany: (cpfEmpresa: string, cpfResponsavel: string) => Promise<AuthUser>;
   loginStudent: (matricula: string, cpf: string) => Promise<AuthUser>;
+  loginVisitor: (cpf: string, senha: string) => Promise<AuthUser>;
+  registerVisitor: (input: {
+    nome: string;
+    cpf: string;
+    email: string;
+    senha: string;
+    eventId: string;
+  }) => Promise<AuthUser>;
   logout: () => Promise<void>;
 }
 
@@ -61,6 +69,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       doLogin('/auth/login/estudante', { matricula, cpf }),
     [doLogin],
   );
+  const loginVisitor = useCallback(
+    (cpf: string, senha: string) => doLogin('/auth/login/visitante', { cpf, senha }),
+    [doLogin],
+  );
+  const registerVisitor = useCallback(
+    async (input: { nome: string; cpf: string; email: string; senha: string; eventId: string }) => {
+      const resp = await api<AuthTokens>('/auth/register/visitante', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+      setTokens(resp);
+      setUser(resp.user);
+      return resp.user;
+    },
+    [],
+  );
 
   const logout = useCallback(async () => {
     const t = getTokens();
@@ -80,7 +104,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginAdmin, loginCompany, loginStudent, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        loginAdmin,
+        loginCompany,
+        loginStudent,
+        loginVisitor,
+        registerVisitor,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

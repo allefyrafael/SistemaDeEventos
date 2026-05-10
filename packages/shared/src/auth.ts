@@ -32,5 +32,23 @@ export const studentLoginSchema = z.object({
 });
 export type StudentLoginInput = z.infer<typeof studentLoginSchema>;
 
+// Auto-cadastro de visitante externo (sem matricula). O visitante define
+// uma senha, que sera usada nos proximos logins. Tambem precisa indicar
+// o evento ao qual quer se inscrever.
+export const visitorRegisterSchema = z.object({
+  nome: z.string().trim().min(3, 'Nome muito curto').max(120),
+  cpf: cpfSchema,
+  email: z.string().email('Email invalido').max(120),
+  senha: z.string().min(8, 'Senha minima de 8 caracteres').max(72),
+  eventId: z.string().uuid('Evento invalido'),
+});
+export type VisitorRegisterInput = z.infer<typeof visitorRegisterSchema>;
+
+export const visitorLoginSchema = z.object({
+  cpf: cpfSchema,
+  senha: z.string().min(8, 'Senha minima de 8 caracteres').max(72),
+});
+export type VisitorLoginInput = z.infer<typeof visitorLoginSchema>;
+
 export const userTypeSchema = z.enum(['ADMIN', 'COMPANY', 'STUDENT']);
 export type UserType = z.infer<typeof userTypeSchema>;
