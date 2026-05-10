@@ -64,7 +64,7 @@ export class ScanService {
 
   async performScan(
     eventId: string,
-    companyUserId: string,
+    actor: { id: string; tipoPerfil: UserType },
     input: ScanRequest,
     ctx: { ip?: string; userAgent?: string },
   ): Promise<ScanResult> {
@@ -103,7 +103,7 @@ export class ScanService {
     const claimed = await this.redis.claimJti(claims.jti, ttlSeconds);
     if (!claimed) {
       await this.audit.log({
-        actorId: companyUserId,
+        actorId: actor.id,
         action: 'scan.reject.replay',
         target: claims.sub,
         metadata: { jti: claims.jti, eventId },
@@ -117,19 +117,38 @@ export class ScanService {
       };
     }
 
-    // 3) Descobre qual empresa o companyUser representa neste evento
-    const myCompanies = await this.prisma.company.findMany({
-      where: {
-        eventId,
-        responsibles: { some: { userId: companyUserId } },
-      },
-      select: { id: true },
-    });
-    if (myCompanies.length === 0) {
-      throw new ForbiddenException('Usuario nao e responsavel de nenhuma empresa deste evento');
+    // 3) Descobre qual empresa esta concedendo o carimbo.
+    // - COMPANY: usa a propria company (a primeira em que e responsavel).
+    // - ADMIN: precisa enviar `actAsCompanyId` (scanner geral do organizador).
+    let companyId: string;
+    if (actor.tipoPerfil === UserType.ADMIN) {
+      if (!input.actAsCompanyId) {
+        throw new BadRequestException(
+          'Admin precisa indicar a empresa que esta concedendo o carimbo (actAsCompanyId).',
+        );
+      }
+      const company = await this.prisma.company.findFirst({
+        where: { id: input.actAsCompanyId, eventId, ativo: true },
+        select: { id: true },
+      });
+      if (!company) {
+        throw new NotFoundException('Empresa nao encontrada neste evento');
+      }
+      companyId = company.id;
+    } else {
+      const myCompanies = await this.prisma.company.findMany({
+        where: {
+          eventId,
+          responsibles: { some: { userId: actor.id } },
+        },
+        select: { id: true },
+      });
+      if (myCompanies.length === 0) {
+        throw new ForbiddenException('Usuario nao e responsavel de nenhuma empresa deste evento');
+      }
+      // Se esta vinculado a mais de uma empresa, usa a primeira. (UI deve permitir escolher.)
+      companyId = myCompanies[0].id;
     }
-    // Se esta vinculado a mais de uma empresa, usa a primeira. (UI deve permitir escolher.)
-    const companyId = myCompanies[0].id;
 
     // 4) Valida stamp configurado
     const stamp = await this.prisma.stampConfig.findFirst({
@@ -184,10 +203,16 @@ export class ScanService {
     });
 
     await this.audit.log({
-      actorId: companyUserId,
+      actorId: actor.id,
       action: 'scan.accept',
       target: claims.sub,
-      metadata: { eventId, companyId, stampId: stamp.id, progressId: progress.id },
+      metadata: {
+        eventId,
+        companyId,
+        stampId: stamp.id,
+        progressId: progress.id,
+        viaAdmin: actor.tipoPerfil === UserType.ADMIN,
+      },
       ip: ctx.ip,
       userAgent: ctx.userAgent,
     });
@@ -205,14 +230,14 @@ export class ScanService {
 
   async performScanBatch(
     eventId: string,
-    companyUserId: string,
+    actor: { id: string; tipoPerfil: UserType },
     items: ScanRequest[],
     ctx: { ip?: string; userAgent?: string },
   ) {
     const results: Array<ScanResult & { clientUuid: string }> = [];
     for (const item of items) {
       try {
-        const r = await this.performScan(eventId, companyUserId, item, ctx);
+        const r = await this.performScan(eventId, actor, item, ctx);
         results.push({ ...r, clientUuid: item.clientUuid });
       } catch (err) {
         results.push({
@@ -261,9 +286,31 @@ export class ScanService {
     }));
   }
 
-  async listStampsCompanyCanGrant(eventId: string, companyUserId: string) {
+  /**
+   * Lista os stamps que o usuario logado pode conceder neste evento.
+   * - ADMIN: todos os stamps do evento (scanner geral do organizador).
+   * - COMPANY: apenas stamps livres OU vinculados a uma de suas empresas.
+   */
+  async listStampsCompanyCanGrant(
+    eventId: string,
+    actor: { id: string; tipoPerfil: UserType },
+  ) {
+    if (actor.tipoPerfil === UserType.ADMIN) {
+      return this.prisma.stampConfig.findMany({
+        where: { eventId },
+        orderBy: [{ ordem: 'asc' }, { createdAt: 'asc' }],
+        select: {
+          id: true,
+          titulo: true,
+          descricao: true,
+          ordem: true,
+          entidadeAutorizadaId: true,
+        },
+      });
+    }
+
     const myCompanies = await this.prisma.company.findMany({
-      where: { eventId, responsibles: { some: { userId: companyUserId } } },
+      where: { eventId, responsibles: { some: { userId: actor.id } } },
       select: { id: true },
     });
     if (myCompanies.length === 0) return [];

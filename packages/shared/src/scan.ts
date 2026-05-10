@@ -23,6 +23,10 @@ export const scanRequestSchema = z.object({
   stampConfigId: z.string().uuid(),         // qual carimbo a empresa quer conceder
   clientUuid: z.string().uuid(),            // idempotency key (essencial para sync offline)
   clientTimestamp: z.string().datetime(),   // quando o scan aconteceu (offline permitido)
+  // Quando o ADMIN do evento opera o scanner geral, ele precisa indicar em
+  // nome de qual empresa esta concedendo o carimbo (auditoria + RN02).
+  // Empresas comuns ignoram este campo (sempre usa a empresa do user logado).
+  actAsCompanyId: z.string().uuid().optional(),
 });
 export type ScanRequest = z.infer<typeof scanRequestSchema>;
 

@@ -47,7 +47,7 @@ export class ScanController {
     return this.scan.issueQrToken(eventId, user.id);
   }
 
-  // RF06: empresa envia leitura do QR
+  // RF06: empresa (ou admin via scanner geral) envia leitura do QR
   @Post('scan')
   @Roles(UserType.COMPANY, UserType.ADMIN)
   submit(
@@ -56,7 +56,12 @@ export class ScanController {
     @Body(new ZodValidationPipe(scanRequestSchema)) dto: ScanRequest,
     @Req() req: Request,
   ) {
-    return this.scan.performScan(eventId, user.id, dto, requestContext(req));
+    return this.scan.performScan(
+      eventId,
+      { id: user.id, tipoPerfil: user.tipoPerfil },
+      dto,
+      requestContext(req),
+    );
   }
 
   // RNF03: sync em lote pos-offline
@@ -68,17 +73,26 @@ export class ScanController {
     @Body(new ZodValidationPipe(scanSyncBatchSchema)) dto: ScanSyncBatch,
     @Req() req: Request,
   ) {
-    return this.scan.performScanBatch(eventId, user.id, dto.items, requestContext(req));
+    return this.scan.performScanBatch(
+      eventId,
+      { id: user.id, tipoPerfil: user.tipoPerfil },
+      dto.items,
+      requestContext(req),
+    );
   }
 
-  // Auxilia a UI da empresa: lista stamps que ela pode carimbar no evento
+  // Lista stamps que o usuario logado pode conceder neste evento.
+  // Empresa: filtra pelas suas empresas. Admin: todos os stamps do evento.
   @Get('scan/grantable-stamps')
   @Roles(UserType.COMPANY, UserType.ADMIN)
   grantable(
     @CurrentUser() user: AuthenticatedUser,
     @Param('eventId', new ParseUUIDPipe()) eventId: string,
   ) {
-    return this.scan.listStampsCompanyCanGrant(eventId, user.id);
+    return this.scan.listStampsCompanyCanGrant(eventId, {
+      id: user.id,
+      tipoPerfil: user.tipoPerfil,
+    });
   }
 
   // Historico de visitas recebidas pela(s) empresa(s) do usuario logado

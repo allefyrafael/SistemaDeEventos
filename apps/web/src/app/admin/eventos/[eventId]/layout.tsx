@@ -65,6 +65,13 @@ const TABS: TabDef[] = [
     description: 'Itens que o participante precisa colecionar.',
   },
   {
+    segment: 'scanner',
+    label: 'Scanner',
+    icon: '⌧',
+    requires: 'qr_scan',
+    description: 'Scanner geral do organizador (em nome de qualquer empresa).',
+  },
+  {
     segment: 'mapa',
     label: 'Mapa',
     icon: '◎',
