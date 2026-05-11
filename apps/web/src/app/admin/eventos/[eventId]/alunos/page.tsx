@@ -21,6 +21,8 @@ interface Student {
   linkedinUrl: string | null;
 }
 
+const PAGE_SIZE = 50;
+
 export default function EventStudentsPage() {
   const { event } = useEventFromParams();
   const [rows, setRows] = useState<Student[] | null>(null);
@@ -28,6 +30,7 @@ export default function EventStudentsPage() {
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<StudentImportResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -72,6 +75,12 @@ export default function EventStudentsPage() {
       (r.matricula ?? '').includes(q)
     );
   });
+
+  const totalPages = filtered ? Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)) : 1;
+  const currentPage = Math.min(page, totalPages);
+  const paged = filtered
+    ? filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+    : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -135,7 +144,10 @@ export default function EventStudentsPage() {
       <TextInput
         placeholder="Buscar por nome, email ou matricula"
         value={filter}
-        onChange={(e) => setFilter(e.target.value)}
+        onChange={(e) => {
+          setFilter(e.target.value);
+          setPage(1);
+        }}
       />
 
       {!filtered ? (
@@ -143,45 +155,113 @@ export default function EventStudentsPage() {
       ) : filtered.length === 0 ? (
         <p className="text-slate-500">Nenhum participante encontrado.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Nome</th>
-                <th className="px-4 py-3">Matricula</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Tipo</th>
-                <th className="px-4 py-3">LinkedIn</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map((s) => (
-                <tr key={s.id}>
-                  <td className="px-4 py-2 font-medium text-slate-900">{s.nome}</td>
-                  <td className="px-4 py-2 text-slate-700">{s.matricula ?? '—'}</td>
-                  <td className="px-4 py-2 text-slate-700">{s.email}</td>
-                  <td className="px-4 py-2 text-slate-700">
-                    {s.studentKind === 'INTERNAL' ? 'Estudante' : 'Externo'}
-                  </td>
-                  <td className="px-4 py-2 text-slate-700">
-                    {s.linkedinUrl ? (
-                      <a
-                        href={s.linkedinUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-brand-primary"
-                      >
-                        perfil
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
+        <>
+          {/* Tabela em md+ */}
+          <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">Matricula</th>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Tipo</th>
+                  <th className="px-4 py-3">LinkedIn</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paged!.map((s) => (
+                  <tr key={s.id}>
+                    <td className="px-4 py-2 font-medium text-slate-900">{s.nome}</td>
+                    <td className="px-4 py-2 text-slate-700">{s.matricula ?? '—'}</td>
+                    <td className="px-4 py-2 text-slate-700">{s.email}</td>
+                    <td className="px-4 py-2 text-slate-700">
+                      {s.studentKind === 'INTERNAL' ? 'Estudante' : 'Externo'}
+                    </td>
+                    <td className="px-4 py-2 text-slate-700">
+                      {s.linkedinUrl ? (
+                        <a
+                          href={s.linkedinUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-brand-primary"
+                        >
+                          perfil
+                        </a>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Cards em mobile (<md) */}
+          <ul className="flex flex-col gap-2 md:hidden">
+            {paged!.map((s) => (
+              <li
+                key={s.id}
+                className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{s.nome}</p>
+                    <p className="text-xs text-slate-600">{s.email}</p>
+                  </div>
+                  <span
+                    className={
+                      s.studentKind === 'INTERNAL'
+                        ? 'rounded-full bg-brand-primary/10 px-2 py-0.5 text-[10px] font-semibold text-brand-primary'
+                        : 'rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700'
+                    }
+                  >
+                    {s.studentKind === 'INTERNAL' ? 'Estudante' : 'Externo'}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span>
+                    Mat.: <span className="text-slate-700">{s.matricula ?? '—'}</span>
+                  </span>
+                  {s.linkedinUrl && (
+                    <a
+                      href={s.linkedinUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-brand-primary"
+                    >
+                      LinkedIn ↗
+                    </a>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="rounded-md border border-slate-200 px-3 py-1 font-medium hover:bg-slate-50 disabled:opacity-40"
+              >
+                ← Anterior
+              </button>
+              <span>
+                Pagina {currentPage} de {totalPages} · {filtered.length} participante(s)
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="rounded-md border border-slate-200 px-3 py-1 font-medium hover:bg-slate-50 disabled:opacity-40"
+              >
+                Proxima →
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

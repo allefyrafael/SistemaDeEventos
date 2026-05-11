@@ -71,32 +71,52 @@ export default function AdminUsersPage() {
       ) : rows.length === 0 ? (
         <p className="text-slate-500">Nenhum administrador cadastrado.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Nome</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">CPF</th>
-                <th className="px-4 py-3">Criado em</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td className="px-4 py-2 font-medium text-slate-900">{r.nome}</td>
-                  <td className="px-4 py-2 text-slate-700">{r.email}</td>
-                  <td className="px-4 py-2 font-mono text-slate-700" title="Mascarado por LGPD">
-                    {maskCpf(r.cpf)}
-                  </td>
-                  <td className="px-4 py-2 text-slate-600">
-                    {new Date(r.createdAt).toLocaleDateString('pt-BR')}
-                  </td>
+        <>
+          {/* Tabela em telas medias+. Em mobile vira lista de cards (md:hidden). */}
+          <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">CPF</th>
+                  <th className="px-4 py-3">Criado em</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td className="px-4 py-2 font-medium text-slate-900">{r.nome}</td>
+                    <td className="px-4 py-2 text-slate-700">{r.email}</td>
+                    <td className="px-4 py-2 font-mono text-slate-700" title="Mascarado por LGPD">
+                      {maskCpf(r.cpf)}
+                    </td>
+                    <td className="px-4 py-2 text-slate-600">
+                      {new Date(r.createdAt).toLocaleDateString('pt-BR')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <ul className="flex flex-col gap-2 md:hidden">
+            {rows.map((r) => (
+              <li
+                key={r.id}
+                className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+              >
+                <p className="text-sm font-semibold text-slate-900">{r.nome}</p>
+                <p className="text-xs text-slate-600">{r.email}</p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                  <span className="font-mono" title="Mascarado por LGPD">
+                    {maskCpf(r.cpf)}
+                  </span>
+                  <span>Desde {new Date(r.createdAt).toLocaleDateString('pt-BR')}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );

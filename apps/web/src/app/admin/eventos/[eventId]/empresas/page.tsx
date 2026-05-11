@@ -105,61 +105,102 @@ export default function EventCompaniesPage() {
       ) : rows.length === 0 ? (
         <p className="text-slate-500">Nenhuma empresa cadastrada neste evento.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Empresa</th>
-                <th className="px-4 py-3">Stand</th>
-                <th className="px-4 py-3">Responsaveis</th>
-                <th className="px-4 py-3">Metricas</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.map((c) => (
-                <tr key={c.id} className={!c.ativo ? 'opacity-50' : ''}>
-                  <td className="px-4 py-3">
-                    <p className="font-semibold text-slate-900">{c.nome}</p>
-                    <p className="text-xs text-slate-500">/{c.slug}</p>
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{c.stand ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {c.responsaveis.map((r) => r.nome).join(', ')}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {c.metricas ? (
-                      <>
-                        {c.metricas.totalCarimbos} carimbos
-                        {c.metricas.notaMedia !== null && (
-                          <> · ★ {c.metricas.notaMedia.toFixed(1)}</>
-                        )}
-                      </>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setEditing(c)}
-                      className="mr-2 text-xs font-medium text-brand-primary"
-                    >
+        <>
+          <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Empresa</th>
+                  <th className="px-4 py-3">Stand</th>
+                  <th className="px-4 py-3">Responsaveis</th>
+                  <th className="px-4 py-3">Metricas</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((c) => (
+                  <tr key={c.id} className={!c.ativo ? 'opacity-50' : ''}>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-slate-900">{c.nome}</p>
+                      <p className="text-xs text-slate-500">/{c.slug}</p>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">{c.stand ?? '—'}</td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {c.responsaveis.map((r) => r.nome).join(', ')}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {c.metricas ? (
+                        <>
+                          {c.metricas.totalCarimbos} carimbos
+                          {c.metricas.notaMedia !== null && (
+                            <> · ★ {c.metricas.notaMedia.toFixed(1)}</>
+                          )}
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setEditing(c)}
+                        className="mr-2 text-xs font-medium text-brand-primary"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void remove(c)}
+                        className="text-xs font-medium text-red-600"
+                      >
+                        Excluir
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* Cards em mobile (<md). */}
+          <ul className="flex flex-col gap-2 md:hidden">
+            {rows.map((c) => (
+              <li
+                key={c.id}
+                className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${!c.ativo ? 'opacity-50' : ''}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{c.nome}</p>
+                    <p className="text-xs text-slate-500">
+                      /{c.slug}
+                      {c.stand ? ` · stand ${c.stand}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex flex-shrink-0 gap-3 text-xs font-medium">
+                    <button type="button" onClick={() => setEditing(c)} className="text-brand-primary">
                       Editar
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void remove(c)}
-                      className="text-xs font-medium text-red-600"
-                    >
+                    <button type="button" onClick={() => void remove(c)} className="text-red-600">
                       Excluir
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-slate-600">
+                  <span className="font-medium text-slate-700">Resp:</span>{' '}
+                  {c.responsaveis.map((r) => r.nome).join(', ') || '—'}
+                </p>
+                {c.metricas && (
+                  <p className="mt-1 text-xs text-slate-600">
+                    {c.metricas.totalCarimbos} carimbos
+                    {c.metricas.notaMedia !== null && (
+                      <> · ★ {c.metricas.notaMedia.toFixed(1)}</>
+                    )}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );
