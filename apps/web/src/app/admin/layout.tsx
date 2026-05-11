@@ -4,17 +4,18 @@ import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
+import { Calendar, Users, type LucideIcon } from 'lucide-react';
 import { useRequireRole, useAuth } from '../../lib/auth-context';
 
 interface NavItem {
   href: Route;
   label: string;
-  icon: string;
+  icon: LucideIcon;
 }
 
 const NAV: NavItem[] = [
-  { href: '/admin' as Route, label: 'Eventos', icon: '⌘' },
-  { href: '/admin/administradores' as Route, label: 'Administradores', icon: '☺' },
+  { href: '/admin' as Route, label: 'Eventos', icon: Calendar },
+  { href: '/admin/administradores' as Route, label: 'Administradores', icon: Users },
 ];
 
 /**
@@ -53,7 +54,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     : 'text-slate-600 hover:bg-slate-50',
                 )}
               >
-                <span className="text-lg">{n.icon}</span>
+                <n.icon size={18} />
                 {n.label}
               </Link>
             );
@@ -100,7 +101,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     : 'text-slate-500',
                 )}
               >
-                {n.icon} {n.label}
+                <span className="inline-flex items-center gap-1.5">
+                  <n.icon size={14} />
+                  {n.label}
+                </span>
               </Link>
             );
           })}

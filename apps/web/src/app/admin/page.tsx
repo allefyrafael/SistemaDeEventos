@@ -6,6 +6,7 @@ import type { Route } from 'next';
 import { clsx } from 'clsx';
 import type { EventStatus, FeatureModule } from '@eventpass/shared';
 import { api } from '../../lib/api';
+import { EVENT_STATUS_LABEL, EVENT_STATUS_COLOR } from '../../lib/event-status';
 import { Button } from '../../components/form';
 
 interface EventRow {
@@ -18,22 +19,6 @@ interface EventRow {
   endsAt: string;
   modules: FeatureModule[];
 }
-
-const STATUS_LABEL: Record<EventStatus, string> = {
-  DRAFT: 'Rascunho',
-  PUBLISHED: 'Publicado',
-  RUNNING: 'Em andamento',
-  CLOSED: 'Encerrado',
-  ARCHIVED: 'Arquivado',
-};
-
-const STATUS_COLOR: Record<EventStatus, string> = {
-  DRAFT: 'bg-slate-100 text-slate-600',
-  PUBLISHED: 'bg-blue-100 text-blue-700',
-  RUNNING: 'bg-emerald-100 text-emerald-700',
-  CLOSED: 'bg-amber-100 text-amber-700',
-  ARCHIVED: 'bg-slate-200 text-slate-500',
-};
 
 export default function AdminHomePage() {
   const [events, setEvents] = useState<EventRow[] | null>(null);
@@ -106,10 +91,10 @@ export default function AdminHomePage() {
                 <span
                   className={clsx(
                     'flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                    STATUS_COLOR[e.status],
+                    EVENT_STATUS_COLOR[e.status],
                   )}
                 >
-                  {STATUS_LABEL[e.status]}
+                  {EVENT_STATUS_LABEL[e.status]}
                 </span>
               </div>
               {e.descricao && (

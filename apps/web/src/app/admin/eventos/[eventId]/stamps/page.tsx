@@ -97,14 +97,14 @@ export default function EventStampsPage() {
         <p className="text-slate-500">Nenhum carimbo configurado.</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {rows.map((s) => (
+          {rows.map((s, idx) => (
             <li
               key={s.id}
               className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
             >
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-900">
-                  #{s.ordem + 1} · {s.titulo}
+                  #{idx + 1} · {s.titulo}
                   {s.obrigatorio && (
                     <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
                       obrigatorio

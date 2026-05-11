@@ -4,7 +4,7 @@ import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useAuth } from '../lib/auth-context';
 
 export function AppShell({
@@ -14,7 +14,7 @@ export function AppShell({
   maxWidthClassName = 'max-w-3xl',
 }: {
   title: string;
-  tabs?: { href: Route | string; label: string; icon?: string }[];
+  tabs?: { href: Route | string; label: string; icon?: ReactNode }[];
   children: React.ReactNode;
   maxWidthClassName?: string;
 }) {
@@ -61,7 +61,11 @@ export function AppShell({
                   active ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-500',
                 )}
               >
-                {t.icon && <span className="text-lg">{t.icon}</span>}
+                {t.icon && (
+                  <span className="flex h-5 w-5 items-center justify-center">
+                    {t.icon}
+                  </span>
+                )}
                 <span>{t.label}</span>
               </Link>
             );

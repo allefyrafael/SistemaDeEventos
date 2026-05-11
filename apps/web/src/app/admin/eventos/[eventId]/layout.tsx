@@ -4,8 +4,24 @@ import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
+import {
+  Building2,
+  Download,
+  FileText,
+  LayoutDashboard,
+  Map as MapIcon,
+  ScanLine,
+  Settings,
+  Stamp as StampIcon,
+  Users as UsersIcon,
+  type LucideIcon,
+} from 'lucide-react';
 import type { FeatureModule } from '@eventpass/shared';
 import { useRequireRole } from '../../../../lib/auth-context';
+import {
+  EVENT_STATUS_COLOR,
+  EVENT_STATUS_LABEL,
+} from '../../../../lib/event-status';
 import {
   EventParamsProvider,
   useEventFromParams,
@@ -20,7 +36,7 @@ import {
 interface TabDef {
   segment: string;
   label: string;
-  icon: string;
+  icon: LucideIcon;
   requires?: FeatureModule;
   description: string;
 }
@@ -29,59 +45,59 @@ const TABS: TabDef[] = [
   {
     segment: '',
     label: 'Visao geral',
-    icon: '◆',
+    icon: LayoutDashboard,
     description: 'Resumo e metricas em tempo real do evento.',
   },
   {
     segment: 'modulos',
     label: 'Modulos',
-    icon: '⚙',
+    icon: Settings,
     description: 'Escolha quais funcionalidades o evento vai usar.',
   },
   {
     segment: 'configuracoes',
     label: 'Dados do evento',
-    icon: '✎',
+    icon: FileText,
     description: 'Editar nome, datas, descricao e status.',
   },
   {
     segment: 'empresas',
     label: 'Empresas',
-    icon: '⚑',
+    icon: Building2,
     requires: 'companies',
     description: 'Cadastro de empresas expositoras e responsaveis.',
   },
   {
     segment: 'alunos',
     label: 'Participantes',
-    icon: '☺',
+    icon: UsersIcon,
     description: 'Importacao e listagem de participantes.',
   },
   {
     segment: 'stamps',
     label: 'Carimbos',
-    icon: '✦',
+    icon: StampIcon,
     requires: 'passport',
     description: 'Itens que o participante precisa colecionar.',
   },
   {
     segment: 'scanner',
     label: 'Scanner',
-    icon: '⌧',
+    icon: ScanLine,
     requires: 'qr_scan',
     description: 'Scanner geral do organizador (em nome de qualquer empresa).',
   },
   {
     segment: 'mapa',
     label: 'Mapa',
-    icon: '◎',
+    icon: MapIcon,
     requires: 'venue_map',
     description: 'Mapa interativo com stands, auditorios e salas.',
   },
   {
     segment: 'exportar',
     label: 'Exportar',
-    icon: '↓',
+    icon: Download,
     requires: 'exports_csv',
     description: 'Relatorios em CSV para Excel.',
   },
@@ -153,7 +169,9 @@ function EventContextLayoutInner({ children }: { children: React.ReactNode }) {
                   : 'text-slate-600 hover:bg-white hover:text-brand-primary',
               )}
             >
-              <span className="mr-1">{t.icon}</span>
+              <span className="mr-1 inline-flex items-center">
+                <t.icon size={14} />
+              </span>
               {t.label}
             </Link>
           );
@@ -188,14 +206,10 @@ function EventHeader({ event }: { event: EventContextData }) {
         <span
           className={clsx(
             'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide',
-            event.status === 'RUNNING' && 'bg-emerald-100 text-emerald-700',
-            event.status === 'PUBLISHED' && 'bg-blue-100 text-blue-700',
-            event.status === 'DRAFT' && 'bg-slate-100 text-slate-600',
-            event.status === 'CLOSED' && 'bg-amber-100 text-amber-700',
-            event.status === 'ARCHIVED' && 'bg-slate-200 text-slate-500',
+            EVENT_STATUS_COLOR[event.status],
           )}
         >
-          {event.status}
+          {EVENT_STATUS_LABEL[event.status]}
         </span>
       </div>
     </header>

@@ -52,8 +52,8 @@ export default function StudentLoginPage() {
         <h1 className="mt-2 text-2xl font-bold text-slate-900">Entrar como participante</h1>
         <p className="text-sm text-slate-600">
           {mode === 'aluno'
-            ? 'Estudantes da instituicao entram com matricula + CPF.'
-            : 'Visitantes externos entram com CPF + senha cadastrada.'}
+            ? 'Estudantes da instituicao entram com a matricula e o CPF cadastrados.'
+            : 'Visitantes externos entram com o CPF e a senha criada no cadastro.'}
         </p>
       </div>
 

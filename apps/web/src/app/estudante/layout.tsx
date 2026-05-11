@@ -1,21 +1,30 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import type { Route } from 'next';
 import { usePathname } from 'next/navigation';
 import type { FeatureModule } from '@eventpass/shared';
+import {
+  BookMarked,
+  Map as MapIcon,
+  MessageSquare,
+  QrCode,
+  User as UserIcon,
+} from 'lucide-react';
 import { useRequireRole } from '../../lib/auth-context';
 import { AppShell } from '../../components/app-shell';
 import { useActiveEvent } from '../../lib/use-active-event';
 
-type Tab = { href: Route; label: string; icon: string; module?: FeatureModule };
+type Tab = { href: Route; label: string; icon: ReactNode; module?: FeatureModule };
+
+const ICON_SIZE = 18;
 
 const ALL_STUDENT_TABS: Tab[] = [
-  { href: '/estudante' as Route, label: 'QR', icon: '◱', module: 'qr_scan' },
-  { href: '/estudante/mapa' as Route, label: 'Mapa', icon: '◎', module: 'venue_map' },
-  { href: '/estudante/passaporte' as Route, label: 'Passaporte', icon: '✦', module: 'passport' },
-  { href: '/estudante/feedback' as Route, label: 'Feedback', icon: '☷', module: 'feedback' },
-  { href: '/estudante/perfil' as Route, label: 'Perfil', icon: '☺', module: 'student_profile' },
+  { href: '/estudante' as Route, label: 'QR', icon: <QrCode size={ICON_SIZE} />, module: 'qr_scan' },
+  { href: '/estudante/mapa' as Route, label: 'Mapa', icon: <MapIcon size={ICON_SIZE} />, module: 'venue_map' },
+  { href: '/estudante/passaporte' as Route, label: 'Passaporte', icon: <BookMarked size={ICON_SIZE} />, module: 'passport' },
+  { href: '/estudante/feedback' as Route, label: 'Feedback', icon: <MessageSquare size={ICON_SIZE} />, module: 'feedback' },
+  { href: '/estudante/perfil' as Route, label: 'Perfil', icon: <UserIcon size={ICON_SIZE} />, module: 'student_profile' },
 ];
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {

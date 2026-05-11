@@ -101,7 +101,7 @@ export default function PassportPage() {
       </div>
 
       <ul className="flex flex-col gap-2">
-        {status.items.map((item) => (
+        {status.items.map((item, idx) => (
           <li
             key={item.stampConfigId}
             className={clsx(
@@ -118,7 +118,7 @@ export default function PassportPage() {
                     : 'bg-slate-100 text-slate-400',
                 )}
               >
-                {item.obtido ? '✓' : item.ordem + 1}
+                {item.obtido ? '✓' : idx + 1}
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-900">{item.titulo}</p>

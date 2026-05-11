@@ -7,27 +7,43 @@ export function Field({
   label,
   children,
   hint,
+  error,
 }: {
   label: string;
   children: ReactNode;
   hint?: string;
+  error?: string;
 }) {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-sm font-medium text-slate-700">{label}</span>
       {children}
-      {hint ? <span className="text-xs text-slate-500">{hint}</span> : null}
+      {error ? (
+        <span className="text-xs font-medium text-red-600" role="alert">
+          {error}
+        </span>
+      ) : hint ? (
+        <span className="text-xs text-slate-500">{hint}</span>
+      ) : null}
     </label>
   );
 }
 
-export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
+export function TextInput({
+  invalid,
+  className,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) {
   return (
     <input
       {...props}
+      aria-invalid={invalid || props['aria-invalid']}
       className={clsx(
-        'w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base outline-none transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20',
-        props.className,
+        'w-full rounded-lg border bg-white px-3 py-3 text-base outline-none transition',
+        invalid
+          ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+          : 'border-slate-300 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20',
+        className,
       )}
     />
   );
