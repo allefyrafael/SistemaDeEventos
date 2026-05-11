@@ -1,319 +1,98 @@
-# EventPass — Plataforma Modular para Eventos
+# EventPass
 
-Plataforma web responsiva (PWA) para digitalizar a operação de eventos: passaporte digital, QR Code dinâmico, scanner offline, gamificação por carimbos e dashboard em tempo real. Cada evento ativa apenas as features (módulos) que precisa.
+Plataforma web modular (PWA) para organização de eventos: passaporte digital, QR Code dinâmico, scanner offline e gamificação por carimbos. Cada evento ativa apenas os módulos que precisa.
 
-## Visão Geral
+## Stack
 
-- **Objetivo:** substituir passaportes de papel e listas em planilha por um fluxo digital de credenciamento, carimbo de visitas e feedback.
-- **Escala alvo:** ~5.000 usuários simultâneos.
-- **Mobile-first:** PWA roda no navegador (Android/iOS) sem precisar de loja.
-- **Offline-ready:** o scanner da empresa funciona offline e sincroniza depois (idempotency key).
-- **Segurança:** desenvolvimento orientado por testes, QR Code anti-fraude (JWT curto + jti single-use no Redis).
-
-## Tech Stack
-
-### Backend
-- **NestJS 11** — Framework TypeScript com arquitetura modular nativa
-- **Prisma 6** — ORM type-safe com migrations automáticas
-- **PostgreSQL 16** — Banco relacional com JSONB para configs flexíveis
-- **Redis 7** — Cache, rate-limit, fila de jobs (BullMQ), blacklist de JWTs
-- **JWT + bcrypt** — Autenticação com 3 estratégias (Admin, Empresa, Estudante)
-- **Helmet, CORS, Throttler** — Segurança por padrão
-
-### Frontend
-- **Next.js 15** — React 19 com App Router, SSR, TypeScript
-- **Tailwind CSS 3.4** — Utility-first styling com tema configurável por evento
-- **Serwist 9** — PWA (Service Worker, offline support, cache strategies)
-- **Zod** — Validação de schemas (compartilhados com a API)
-- **ZXing** — Leitura de QR Code via câmera
-
-### Compartilhado
-- **@eventpass/shared** — Workspace package com tipos/schemas Zod (auth, events, scan, etc.)
-- **pnpm workspaces** — Monorepo com 3 pacotes (`apps/api`, `apps/web`, `packages/shared`)
-
-### DevOps
-- **Docker Compose** — Postgres + Redis locais
-- **pnpm 9** — Package manager (workspaces nativas)
-- **TypeScript 5.7** — Type-safe em todo o projeto
+Monorepo pnpm com **NestJS 11 + Prisma 6** (`apps/api`), **Next.js 15 + React 19 + Tailwind + Serwist PWA + ZXing** (`apps/web`) e schemas Zod compartilhados (`packages/shared`). Postgres 16 e Redis 7 sobem via Docker Compose.
 
 ## Pré-requisitos
 
-- **Node.js** ≥ 20
-- **pnpm** ≥ 9 (`npm install -g pnpm@latest`)
-- **Docker Desktop** (para Postgres + Redis)
-- **Git** (v2.49+)
+- Node.js ≥ 20
+- pnpm ≥ 9 — `npm install -g pnpm@latest`
+- Docker Desktop
+- Git ≥ 2.49
 
-## Como começar
-
-### 1. Clone e instale
+## Setup
 
 ```bash
 git clone https://github.com/allefyrafael/SistemaDeEventos
 cd SistemaDeEventos
-pnpm install
-```
-
-### 2. Configure as variáveis de ambiente
-
-```bash
 cp .env.example .env
-```
+pnpm install
 
-Padrão funcional para dev:
-
-```env
-DATABASE_URL="postgresql://eventpass:eventpass_dev_password@localhost:5432/eventpass?schema=public"
-REDIS_URL="redis://localhost:6379"
-JWT_ACCESS_SECRET="dev-only-change-me-access-secret-min-32-chars"
-JWT_REFRESH_SECRET="dev-only-change-me-refresh-secret-min-32-chars"
-JWT_QR_SECRET="dev-only-change-me-qr-code-secret-rotates-often"
-API_PORT=3001
-WEB_PORT=3000
-```
-
-### 3. Suba a infra (Postgres + Redis)
-
-```bash
-pnpm db:up
-docker compose ps   # esperar healthy (~10s)
-```
-
-### 4. Migrações e seed
-
-```bash
+pnpm db:up                            # sobe Postgres + Redis
 cd apps/api
-pnpm prisma migrate dev
-pnpm prisma:seed
+pnpm prisma migrate dev               # aplica migrations
+pnpm prisma:seed                      # admin + evento + empresas + alunos demo
 ```
 
-Isso cria:
-- Tabelas do schema Prisma
-- **Admin demo:** CPF `00000000000`, senha `admin1234`
-- **Evento demo:** "Evento Demo 2026" com módulos básicos ativos
-- 2 empresas (TechCo, Carreiras Hub), 2 estudantes demo
+Dois terminais para o dev:
 
-### 5. Rodar dev
-
-**Terminal 1 — API:**
 ```bash
-cd apps/api
-pnpm dev   # http://localhost:3001
+cd apps/api && pnpm dev   # http://localhost:3001
+cd apps/web && pnpm dev   # http://localhost:3000
 ```
 
-**Terminal 2 — Web:**
+## Credenciais demo
+
+| Perfil | Credenciais |
+|--------|-------------|
+| Admin | CPF `00000000000` · senha `admin1234` |
+| Estudante interno | matrícula `202600001` · CPF `33333333333` |
+| Empresa (TechCo) | cpfEmpresa `11111111111` · cpfResponsavel `11111111112` |
+| Empresa (Carreiras Hub) | cpfEmpresa `22222222222` · cpfResponsavel `22222222223` |
+
+Visitante externo se auto-cadastra em [/cadastro/visitante](http://localhost:3000/cadastro/visitante).
+
+## Comandos úteis
+
 ```bash
-cd apps/web
-pnpm dev   # http://localhost:3000
+pnpm typecheck            # tsc --noEmit em todos os workspaces
+pnpm test                 # unit (jest / vitest)
+pnpm lint
+pnpm shared:build         # rebuild dos schemas Zod compartilhados
+pnpm db:reset             # apaga volumes + sobe Postgres/Redis do zero
+```
+
+Após puxar mudanças que tocam `packages/shared` ou `schema.prisma`:
+
+```bash
+pnpm install
+pnpm shared:build
+cd apps/api && pnpm prisma generate
 ```
 
 ## Estrutura
 
 ```
-SistemaDeEventos/
-├── apps/
-│   ├── api/                          # NestJS backend
-│   │   ├── src/
-│   │   │   ├── core/                 # Modulos globais (config, prisma, redis, module-registry)
-│   │   │   ├── modules/              # Feature modules (auth, events, passport, scan, ...)
-│   │   │   ├── app.module.ts
-│   │   │   └── main.ts
-│   │   ├── prisma/
-│   │   │   ├── schema.prisma
-│   │   │   ├── migrations/
-│   │   │   └── seed.ts
-│   │   └── package.json
-│   │
-│   └── web/                          # Next.js frontend
-│       ├── src/app/                  # Pages + layouts (App Router)
-│       │   ├── page.tsx              # Home (redireciona por perfil)
-│       │   ├── layout.tsx
-│       │   ├── login/                # 3 telas de login (admin/empresa/estudante)
-│       │   ├── admin/                # Dashboard admin
-│       │   ├── empresa/              # Scanner + métricas
-│       │   └── estudante/            # QR + feedback + progresso
-│       ├── src/lib/                  # api client, auth, scan-queue offline
-│       ├── public/                   # Assets estáticos (icons, manifest)
-│       └── package.json
-│
-├── packages/
-│   └── shared/                       # @eventpass/shared — tipos/schemas Zod
-│       └── src/
-│           ├── auth.ts
-│           ├── events.ts
-│           ├── scan.ts
-│           ├── companies.ts
-│           ├── feedback.ts
-│           └── index.ts
-│
-├── docker-compose.yml                # Postgres 16 + Redis 7
-├── .env.example
-├── pnpm-workspace.yaml
-├── package.json
-└── README.md
+apps/
+  api/   @eventpass/api     NestJS 11 + Prisma 6 + Postgres + Redis
+  web/   @eventpass/web     Next.js 15 + Tailwind + Serwist + ZXing
+packages/
+  shared/  @eventpass/shared   Zod schemas + tipos compartilhados
+docker-compose.yml          Postgres 16 + Redis 7
 ```
 
-## Autenticação
+Detalhes do schema vivem em [`apps/api/prisma/schema.prisma`](apps/api/prisma/schema.prisma). Catálogo de módulos feature, tipos e contratos da API em [`packages/shared/src/`](packages/shared/src/).
 
-### 3 Estratégias de Login
+## Conceitos centrais
 
-```typescript
-// Admin
-POST /api/v1/auth/login/admin
-{ "cpf": "00000000000", "senha": "admin1234" }
-
-// Empresa (2 CPFs distintos da mesma empresa)
-POST /api/v1/auth/login/empresa
-{ "cpfEmpresa": "11111111111", "cpfResponsavel": "11111111112" }
-
-// Estudante interno (matrícula + CPF)
-POST /api/v1/auth/login/estudante
-{ "matricula": "202600001", "cpf": "33333333333" }
-```
-
-**Resposta:**
-```json
-{
-  "accessToken": "eyJhbGc...",
-  "refreshToken": "eyJhbGc...",
-  "user": { "id": "...", "tipoPerfil": "ADMIN", "nome": "..." }
-}
-```
-
-**Refresh / Logout:**
-```
-POST /api/v1/auth/refresh   { "refreshToken": "..." }
-POST /api/v1/auth/logout    { "refreshToken": "..." }
-```
-
-### Rotas protegidas
-
-Todas as rotas (exceto `/auth/*` e `/health/*`) exigem `Authorization: Bearer <accessToken>`. Use `@Public()` para abrir endpoints específicos.
-
-## Módulos (ligáveis por evento)
-
-Cada evento tem um `config` JSON listando os módulos ativos:
-
-```json
-{
-  "modules": ["passport", "qr_scan", "feedback", "companies", "student_profile", "dashboard_live", "exports_csv"],
-  "theme": { "primary": "#0057A3", "logoUrl": "..." },
-  "passport": { "requiredStamps": 6 },
-  "qr_scan": { "tokenTtlSeconds": 30, "rotateEverySeconds": 20 }
-}
-```
-
-**Módulos disponíveis:**
-- `passport` — Carimbos / gamificação
-- `qr_scan` — QR Code dinâmico + scanner
-- `feedback` — Avaliação pós-visita
-- `companies` — Cadastro de expositores
-- `student_profile` — LinkedIn + CV
-- `dashboard_live` — Métricas em tempo real
-- `exports_csv` — Exportação de concludentes
-- `certificate` — Certificado digital (não implementado)
-- `check_in` — Check-in de entrada (não implementado)
-- `raffle` — Sorteio (não implementado)
-- `venue_map` — Mapa interativo (em desenvolvimento)
-
-### Como usar o ModuleRegistry
-
-```typescript
-@Controller('events/:eventId/passport')
-@UseGuards(EnabledModuleGuard)
-@RequiresModule('passport')
-export class PassportController {
-  @Get()
-  getPassports(@Param('eventId') eventId: string) { ... }
-}
-```
-
-Se o módulo não estiver ativo no evento, retorna `404 Not Found`.
-
-## Tipos de estudante
-
-`User.studentKind` distingue:
-- **`INTERNAL`** — estudante cadastrado da instituição organizadora (com matrícula).
-- **`EXTERNAL`** — visitante externo (sem matrícula). Cadastro próprio.
-
-## Testes
-
-```bash
-pnpm test               # unit (Jest / Vitest)
-pnpm test:watch
-pnpm test:coverage
-cd apps/web && pnpm test:e2e   # Playwright
-```
-
-## Type-check e Lint
-
-```bash
-pnpm typecheck
-pnpm lint
-```
-
-## Endpoints principais
-
-### Health
-```
-GET /api/v1/health/live      — sem dependências (liveness)
-GET /api/v1/health           — com DB + Redis (readiness)
-```
-
-### Auth
-```
-POST /api/v1/auth/login/admin
-POST /api/v1/auth/login/empresa
-POST /api/v1/auth/login/estudante
-POST /api/v1/auth/refresh
-POST /api/v1/auth/logout
-GET  /api/v1/auth/me
-```
-
-### Events
-```
-GET    /api/v1/events
-POST   /api/v1/events
-GET    /api/v1/events/:id
-PATCH  /api/v1/events/:id
-```
-
-### Passport / Scan
-```
-GET  /api/v1/events/:eventId/passport/qr
-POST /api/v1/events/:eventId/scan
-POST /api/v1/events/:eventId/scan/sync
-GET  /api/v1/events/:eventId/scan/grantable-stamps
-GET  /api/v1/events/:eventId/scan/history
-```
+- **Eventos modulares** — `Event.config.modules` lista as features ativas (`passport`, `qr_scan`, `feedback`, `companies`, `student_profile`, `dashboard_live`, `exports_csv`, `venue_map`, …). Rotas usam `@RequiresModule('xxx')` e retornam 404 se a feature não está ligada.
+- **4 estratégias de login** — admin (CPF + senha), empresa (2 CPFs distintos da mesma company), estudante interno (matrícula + CPF), visitante externo (CPF + senha criada no auto-cadastro).
+- **QR Code anti-fraude** — JWT curto (TTL 30s, secret separado) com `jti` único reservado no Redis no primeiro scan; replay rejeitado.
+- **Scanner offline** — fila em IndexedDB com idempotency key; sincroniza ao voltar online.
+- **Passaporte N:M** — cada `StampConfig` pode ter N empresas autorizadas via tabela junção `StampConfigCompany`. Lista vazia = qualquer empresa do evento pode carimbar.
 
 ## Troubleshooting
 
-### Docker não inicia
-```bash
-docker ps   # verifique se Docker Desktop está rodando
-```
-
-### Porta 3001/3000 ocupada
-Libere a porta ou ajuste `apps/api/package.json` / `apps/web/package.json`.
-
-### Prisma client não gerado
-```bash
-cd apps/api && pnpm prisma generate
-```
-
-### Erros de typecheck
-```bash
-pnpm typecheck
-# se persistir:
-rm -rf node_modules/.pnpm && pnpm install
-```
-
-## Contribuindo
-
-1. Crie uma branch: `git checkout -b feat/sua-feature`
-2. Faça commits com mensagens claras (ver histórico)
-3. Rode testes + typecheck antes do PR: `pnpm test && pnpm typecheck`
-4. Abra um PR descrevendo motivação e plano de teste
+| Problema | Solução |
+|----------|---------|
+| `tsc` não reconhecido | Rode `pnpm install` na raiz primeiro |
+| `Cannot find module @eventpass/shared` | Rode `pnpm shared:build` |
+| Postgres não sobe | `docker ps` — verifique Docker Desktop rodando |
+| Porta 3000/3001 ocupada | Ajuste em `apps/{web,api}/package.json` |
+| Acesso de celular pela rede local falha | Use `ngrok http 3000` (workaround conhecido) |
 
 ## Licença
 
