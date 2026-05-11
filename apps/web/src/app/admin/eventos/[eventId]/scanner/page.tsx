@@ -270,12 +270,21 @@ export default function AdminScannerPage() {
             <option value="" disabled>
               Selecione um carimbo
             </option>
-            {stamps.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.titulo}
-                {s.authorizedCompanyIds.length > 0 ? ' (restrito)' : ''}
-              </option>
-            ))}
+            {stamps.map((s) => {
+              const restricted = s.authorizedCompanyIds.length > 0;
+              const allowedForCurrent =
+                !restricted || s.authorizedCompanyIds.includes(companyId);
+              const label = !restricted
+                ? s.titulo
+                : allowedForCurrent
+                  ? `${s.titulo} (restrito — voce pode)`
+                  : `${s.titulo} (restrito a outra empresa)`;
+              return (
+                <option key={s.id} value={s.id} disabled={!allowedForCurrent}>
+                  {label}
+                </option>
+              );
+            })}
           </select>
           {stampInvalidForCompany && (
             <p className="mt-1 text-xs text-amber-700">
@@ -289,6 +298,7 @@ export default function AdminScannerPage() {
       <div className="relative overflow-hidden rounded-xl bg-black shadow-sm">
         <video
           ref={videoRef}
+          aria-label="Scanner de QR Code do participante"
           className={clsx('aspect-square w-full object-cover', !scanning && 'hidden')}
           muted
           playsInline

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { PublicEvent } from '@eventpass/shared';
@@ -8,7 +8,16 @@ import { useAuth } from '../../../lib/auth-context';
 import { api, ApiError } from '../../../lib/api';
 import { Field, TextInput, Button, ErrorBanner } from '../../../components/form';
 
-export default function VisitorRegisterPage() {
+export default function VisitorRegisterPageWrapper() {
+  // Suspense necessario pra Next.js 15 aceitar useSearchParams.
+  return (
+    <Suspense fallback={<main className="p-6 text-sm text-slate-500">Carregando...</main>}>
+      <VisitorRegisterPage />
+    </Suspense>
+  );
+}
+
+function VisitorRegisterPage() {
   const { registerVisitor } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,9 +78,20 @@ export default function VisitorRegisterPage() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-6 pb-12">
       <div>
-        <Link href="/login/estudante" className="text-sm text-slate-500">
+        <button
+          type="button"
+          onClick={() => {
+            // Volta para a tela anterior se houver historico; cai pra home senao.
+            if (typeof window !== 'undefined' && window.history.length > 1) {
+              router.back();
+            } else {
+              router.replace('/');
+            }
+          }}
+          className="text-sm text-slate-500 hover:text-brand-primary"
+        >
           &larr; Voltar
-        </Link>
+        </button>
         <h1 className="mt-2 text-2xl font-bold text-slate-900">Cadastro de visitante</h1>
         <p className="text-sm text-slate-600">
           Preencha seus dados para participar do evento como visitante externo.

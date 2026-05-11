@@ -269,7 +269,17 @@ export default function CompanyScannerPage() {
 
   useEffect(() => () => controlsRef.current?.stop(), []);
 
-  if (!event) return <p className="text-slate-500">Carregando evento...</p>;
+  if (!event) {
+    return (
+      <div className="rounded-xl bg-white p-6 text-center text-sm text-slate-600 shadow-sm">
+        <p className="font-semibold text-slate-800">Sem evento ativo</p>
+        <p className="mt-1 text-xs text-slate-500">
+          Sua empresa nao esta vinculada a nenhum evento publicado no momento.
+          Procure a equipe da organizacao para conferir o cadastro.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -340,17 +350,26 @@ export default function CompanyScannerPage() {
       <div className="relative overflow-hidden rounded-xl bg-black shadow-sm">
         <video
           ref={videoRef}
+          aria-label="Scanner de QR Code do participante"
           className={clsx('aspect-square w-full object-cover', !scanning && 'hidden')}
           muted
           playsInline
         />
         {!scanning && (
-          <div className="flex aspect-square items-center justify-center bg-slate-900 text-slate-400">
+          <div
+            role="status"
+            aria-label="Camera desligada"
+            className="flex aspect-square items-center justify-center bg-slate-900 text-slate-400"
+          >
             Camera desligada
           </div>
         )}
         {scanning && paused && (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-emerald-500/85 text-white">
+          <div
+            role="status"
+            aria-live="polite"
+            className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-emerald-500/85 text-white"
+          >
             <span className="text-6xl font-bold leading-none">✓</span>
             <span className="text-sm font-semibold uppercase tracking-wide">Carimbo concedido</span>
           </div>

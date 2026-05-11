@@ -122,17 +122,22 @@ export default function StudentProfilePage() {
         <div className="mt-4 flex flex-col gap-3">
           <Field label="LinkedIn" hint="Cole a URL completa do seu perfil">
             <TextInput
+              type="url"
               value={linkedin}
               onChange={(e) => setLinkedin(e.target.value)}
               placeholder="https://www.linkedin.com/in/seu-perfil"
               inputMode="url"
+              pattern="https?://.*"
             />
           </Field>
-          <Field label="Curriculo (URL ou chave)" hint="Opcional - pode ser um link Drive/Dropbox">
+          <Field label="Curriculo (URL)" hint="Opcional - pode ser um link Drive/Dropbox">
             <TextInput
+              type="url"
               value={curriculo}
               onChange={(e) => setCurriculo(e.target.value)}
               placeholder="https://..."
+              inputMode="url"
+              pattern="https?://.*"
             />
           </Field>
           <Button onClick={save} disabled={saving}>

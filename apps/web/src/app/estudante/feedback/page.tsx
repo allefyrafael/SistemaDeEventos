@@ -92,11 +92,11 @@ function FeedbackContent() {
           respostas: answers,
         },
       });
-      setOk('Obrigado! Feedback registrado.');
+      setOk('Obrigado! Feedback registrado. Redirecionando para seu passaporte...');
       setPendentes((p) => p?.filter((x) => x.companyId !== selected.companyId) ?? null);
       setSelected(null);
       setTemplate(null);
-      setTimeout(() => router.push('/estudante/passaporte'), 800);
+      setTimeout(() => router.push('/estudante/passaporte'), 1200);
     } catch (e) {
       setErr((e as Error).message);
     } finally {

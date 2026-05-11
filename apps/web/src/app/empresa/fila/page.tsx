@@ -66,7 +66,14 @@ export default function QueuePage() {
     await load();
   }
 
-  if (!event) return null;
+  if (!event) {
+    return (
+      <div className="rounded-xl bg-white p-6 text-center text-sm text-slate-600 shadow-sm">
+        Sem evento ativo. A fila offline aparece quando voce esta vinculado a
+        um evento e tem scans pendentes de sincronizacao.
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">

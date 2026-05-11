@@ -53,7 +53,10 @@ export default function EventOverviewPage() {
     async function load() {
       try {
         const s = await api<DashboardSummary>(`/events/${eventId}/dashboard/summary`);
-        if (alive) setSummary(s);
+        if (alive) {
+          setSummary(s);
+          setErr(null); // limpa erro antigo quando volta a funcionar
+        }
       } catch (e) {
         if (alive) setErr((e as Error).message);
       }
