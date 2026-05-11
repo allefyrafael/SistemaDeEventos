@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
+import { maskCpf } from '../../../lib/format';
 import {
   Button,
   ErrorBanner,
@@ -85,7 +86,9 @@ export default function AdminUsersPage() {
                 <tr key={r.id}>
                   <td className="px-4 py-2 font-medium text-slate-900">{r.nome}</td>
                   <td className="px-4 py-2 text-slate-700">{r.email}</td>
-                  <td className="px-4 py-2 text-slate-700">{r.cpf}</td>
+                  <td className="px-4 py-2 font-mono text-slate-700" title="Mascarado por LGPD">
+                    {maskCpf(r.cpf)}
+                  </td>
                   <td className="px-4 py-2 text-slate-600">
                     {new Date(r.createdAt).toLocaleDateString('pt-BR')}
                   </td>

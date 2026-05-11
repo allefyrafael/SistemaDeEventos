@@ -16,6 +16,17 @@ export default function HomePage() {
     else router.replace('/estudante');
   }, [user, loading, router]);
 
+  // Evita piscar os CTAs durante a checagem inicial de sessao ou enquanto o
+  // useEffect acima ainda nao redirecionou um usuario logado.
+  if (loading || user) {
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-3 p-6">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-primary/20 border-t-brand-primary" />
+        <p className="text-sm text-slate-500">Carregando...</p>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 p-6">
       <div className="text-center">

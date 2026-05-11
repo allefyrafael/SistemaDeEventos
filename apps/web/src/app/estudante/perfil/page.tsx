@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth-context';
+import { maskCpf } from '../../../lib/format';
 import {
   Button,
   ErrorBanner,
@@ -22,11 +23,6 @@ interface Profile {
   curriculoKey: string | null;
 }
 
-function maskCpf(cpf: string): string {
-  if (cpf.length !== 11) return cpf;
-  return `${cpf.slice(0, 3)}.***.**${cpf.slice(9)}`;
-}
-
 export default function StudentProfilePage() {
   const { logout } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -35,13 +31,18 @@ export default function StudentProfilePage() {
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const p = await api<Profile>('/me/profile');
-      setProfile(p);
-      setLinkedin(p.linkedinUrl ?? '');
-      setCurriculo(p.curriculoKey ?? '');
+      try {
+        const p = await api<Profile>('/me/profile');
+        setProfile(p);
+        setLinkedin(p.linkedinUrl ?? '');
+        setCurriculo(p.curriculoKey ?? '');
+      } catch (e) {
+        setLoadError((e as Error).message);
+      }
     })();
   }, []);
 
@@ -66,7 +67,21 @@ export default function StudentProfilePage() {
     }
   }
 
-  if (!profile) return <p className="text-slate-500">Carregando...</p>;
+  if (loadError) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        Nao foi possivel carregar seu perfil: {loadError}
+      </div>
+    );
+  }
+  if (!profile) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-xl bg-white p-8 shadow-sm">
+        <div className="h-7 w-7 animate-spin rounded-full border-4 border-brand-primary/20 border-t-brand-primary" />
+        <p className="text-sm text-slate-500">Carregando perfil...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">

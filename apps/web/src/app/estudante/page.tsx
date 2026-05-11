@@ -21,24 +21,31 @@ export default function StudentHomePage() {
   useEffect(() => {
     if (!event) return;
     let alive = true;
-    let timer: ReturnType<typeof setTimeout>;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     async function refresh() {
       try {
         const r = await api<QrResp>(`/events/${event!.id}/qr/token`, { method: 'POST' });
         if (!alive) return;
         setQr(r);
+        setErr(null);
         setCountdown(Math.floor((new Date(r.expiresAt).getTime() - Date.now()) / 1000));
+        // Re-agenda usando o rotateInSeconds do response (e nao um 20 hardcoded).
+        clearTimeout(timer);
+        timer = setTimeout(() => void refresh(), Math.max(5, r.rotateInSeconds) * 1000);
       } catch (e) {
+        if (!alive) return;
         setErr((e as Error).message);
+        // Tenta de novo em 10s mesmo em caso de erro pra nao deixar o QR estagnado.
+        clearTimeout(timer);
+        timer = setTimeout(() => void refresh(), 10_000);
       }
     }
 
     void refresh();
-    timer = setInterval(() => void refresh(), (event ? 20 : 20) * 1000);
     return () => {
       alive = false;
-      clearInterval(timer);
+      clearTimeout(timer);
     };
   }, [event]);
 
@@ -57,7 +64,14 @@ export default function StudentHomePage() {
     });
   }, [qr]);
 
-  if (loading) return <p className="text-slate-500">Carregando evento...</p>;
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-white p-8 shadow-sm">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-primary/20 border-t-brand-primary" />
+        <p className="text-sm text-slate-500">Carregando evento...</p>
+      </div>
+    );
+  }
   if (!event) {
     return (
       <div className="rounded-lg bg-white p-6 text-center text-slate-600 shadow-sm">

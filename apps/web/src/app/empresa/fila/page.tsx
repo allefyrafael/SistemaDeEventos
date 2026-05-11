@@ -59,6 +59,9 @@ export default function QueuePage() {
   }
 
   async function drop(id: string) {
+    if (!confirm('Descartar este scan? Ele NAO sera enviado e nao da pra recuperar depois.')) {
+      return;
+    }
     await removeScan(id);
     await load();
   }

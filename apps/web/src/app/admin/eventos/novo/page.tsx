@@ -43,16 +43,35 @@ export default function NewEventPage() {
 
   async function submit() {
     setErr(null);
+    // Validacoes client-side pra dar feedback inline sem precisar do roundtrip.
+    if (!nome.trim()) {
+      setErr('Informe o nome do evento');
+      return;
+    }
+    if (!startsAt || !endsAt) {
+      setErr('Informe as datas de inicio e fim');
+      return;
+    }
+    const start = new Date(startsAt);
+    const end = new Date(endsAt);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      setErr('Datas invalidas');
+      return;
+    }
+    if (end <= start) {
+      setErr('A data de fim precisa ser depois da data de inicio');
+      return;
+    }
     setSaving(true);
     try {
       const created = await api<{ id: string }>('/events', {
         method: 'POST',
         body: {
-          nome,
+          nome: nome.trim(),
           slug: slug || slugify(nome),
           descricao: descricao || undefined,
-          startsAt: fromLocalInput(startsAt),
-          endsAt: fromLocalInput(endsAt),
+          startsAt: start.toISOString(),
+          endsAt: end.toISOString(),
           modules: DEFAULT_MODULES,
         },
       });

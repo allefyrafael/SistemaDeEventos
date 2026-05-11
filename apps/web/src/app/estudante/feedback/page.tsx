@@ -45,11 +45,16 @@ function FeedbackContent() {
   useEffect(() => {
     if (!event) return;
     void (async () => {
-      const rows = await api<Pending[]>(`/events/${event.id}/feedback/me/pending`);
-      setPendentes(rows);
-      if (preselect) {
-        const chosen = rows.find((r) => r.companyId === preselect);
-        if (chosen) setSelected(chosen);
+      try {
+        const rows = await api<Pending[]>(`/events/${event.id}/feedback/me/pending`);
+        setPendentes(rows);
+        if (preselect) {
+          const chosen = rows.find((r) => r.companyId === preselect);
+          if (chosen) setSelected(chosen);
+        }
+      } catch (e) {
+        setErr((e as Error).message);
+        setPendentes([]); // sai do "Carregando..." e mostra estado de erro
       }
     })();
   }, [event, preselect]);
@@ -59,10 +64,14 @@ function FeedbackContent() {
     setTemplate(null);
     setAnswers({});
     void (async () => {
-      const t = await api<FeedbackTemplate>(
-        `/events/${event.id}/feedback/template?companyId=${selected.companyId}`,
-      );
-      setTemplate(t);
+      try {
+        const t = await api<FeedbackTemplate>(
+          `/events/${event.id}/feedback/template?companyId=${selected.companyId}`,
+        );
+        setTemplate(t);
+      } catch (e) {
+        setErr((e as Error).message);
+      }
     })();
   }, [event, selected]);
 

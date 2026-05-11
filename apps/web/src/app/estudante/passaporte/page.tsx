@@ -26,24 +26,49 @@ interface PassportStatus {
 }
 
 export default function PassportPage() {
-  const { event } = useActiveEvent();
+  const { event, loading: eventLoading } = useActiveEvent();
   const [status, setStatus] = useState<PassportStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!event) return;
     void (async () => {
       setLoading(true);
+      setErr(null);
       try {
         const s = await api<PassportStatus>(`/events/${event.id}/passport/me/status`);
         setStatus(s);
+      } catch (e) {
+        setErr((e as Error).message);
       } finally {
         setLoading(false);
       }
     })();
   }, [event]);
 
-  if (loading) return <p className="text-slate-500">Carregando passaporte...</p>;
+  if (eventLoading || loading) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-xl bg-white p-8 shadow-sm">
+        <div className="h-7 w-7 animate-spin rounded-full border-4 border-brand-primary/20 border-t-brand-primary" />
+        <p className="text-sm text-slate-500">Carregando passaporte...</p>
+      </div>
+    );
+  }
+  if (!event) {
+    return (
+      <div className="rounded-xl bg-white p-6 text-center text-sm text-slate-600 shadow-sm">
+        Voce ainda nao esta inscrito em nenhum evento.
+      </div>
+    );
+  }
+  if (err) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        Nao foi possivel carregar seu passaporte: {err}
+      </div>
+    );
+  }
   if (!status) return null;
 
   const progress = status.totalRequired === 0

@@ -38,9 +38,20 @@ export default function EventCompaniesPage() {
 
   async function remove(c: CompanyDto) {
     if (!event) return;
-    if (!confirm(`Excluir "${c.nome}"?`)) return;
+    const respsCount = c.responsaveis.length;
+    const stampsTxt =
+      c.metricas && c.metricas.totalCarimbos > 0
+        ? ` Esta empresa ja concedeu ${c.metricas.totalCarimbos} carimbo(s) que serao mantidos no historico mas perderao o vinculo com a empresa.`
+        : '';
+    const respsTxt =
+      respsCount > 0
+        ? ` ${respsCount} responsavel(eis) perdera(o) acesso de empresa neste evento.`
+        : '';
+    const message = `Excluir "${c.nome}"?${respsTxt}${stampsTxt}\n\nEsta acao nao pode ser desfeita.`;
+    if (!confirm(message)) return;
     try {
       await api(`/events/${event.id}/companies/${c.id}`, { method: 'DELETE' });
+      setOk(`Empresa "${c.nome}" excluida.`);
       await load();
     } catch (e) {
       setErr((e as Error).message);

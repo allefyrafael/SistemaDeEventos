@@ -16,16 +16,37 @@ interface Visit {
 export default function CompanyHistoryPage() {
   const { event } = useActiveEvent();
   const [rows, setRows] = useState<Visit[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!event) return;
     void (async () => {
-      const data = await api<Visit[]>(`/events/${event.id}/scan/history`);
-      setRows(data);
+      try {
+        const data = await api<Visit[]>(`/events/${event.id}/scan/history`);
+        setRows(data);
+        setErr(null);
+      } catch (e) {
+        setErr((e as Error).message);
+        setRows([]); // evita "Carregando..." eterno
+      }
     })();
   }, [event]);
 
-  if (!rows) return <p className="text-slate-500">Carregando...</p>;
+  if (err) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        Nao foi possivel carregar o historico: {err}
+      </div>
+    );
+  }
+  if (!rows) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-xl bg-white p-8 shadow-sm">
+        <div className="h-7 w-7 animate-spin rounded-full border-4 border-brand-primary/20 border-t-brand-primary" />
+        <p className="text-sm text-slate-500">Carregando historico...</p>
+      </div>
+    );
+  }
 
   if (rows.length === 0) {
     return (
