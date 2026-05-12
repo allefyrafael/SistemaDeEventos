@@ -5,6 +5,7 @@ import { api } from '../../../lib/api';
 import { useActiveEvent } from '../../../lib/use-active-event';
 import { listScans, removeScan } from '../../../lib/scan-queue';
 import { Button, SuccessBanner, ErrorBanner } from '../../../components/form';
+import { useConfirm } from '../../../components/confirm-modal';
 
 interface Row {
   clientUuid: string;
@@ -16,6 +17,7 @@ interface Row {
 
 export default function QueuePage() {
   const { event } = useActiveEvent();
+  const confirm = useConfirm();
   const [rows, setRows] = useState<Row[]>([]);
   const [ok, setOk] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -59,9 +61,13 @@ export default function QueuePage() {
   }
 
   async function drop(id: string) {
-    if (!confirm('Descartar este scan? Ele NAO sera enviado e nao da pra recuperar depois.')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Descartar este scan?',
+      message:
+        'O carimbo NAO sera enviado e nao da pra recuperar depois. Use isso so se o QR tiver expirado ou voce reconhecer que foi um erro.',
+      confirmLabel: 'Descartar',
+    });
+    if (!ok) return;
     await removeScan(id);
     await load();
   }

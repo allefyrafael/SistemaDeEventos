@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { StampConfigDto, CompanyDto } from '@eventpass/shared';
 import { api } from '../../../../../lib/api';
 import { useEventFromParams } from '../../../../../lib/use-event-from-params';
+import { useConfirm } from '../../../../../components/confirm-modal';
 import {
   Button,
   ErrorBanner,
@@ -14,6 +15,7 @@ import {
 
 export default function EventStampsPage() {
   const { event } = useEventFromParams();
+  const confirm = useConfirm();
   const [rows, setRows] = useState<StampConfigDto[] | null>(null);
   const [companies, setCompanies] = useState<CompanyDto[]>([]);
   const [editing, setEditing] = useState<StampConfigDto | null>(null);
@@ -33,9 +35,16 @@ export default function EventStampsPage() {
 
   async function remove(s: StampConfigDto) {
     if (!event) return;
-    if (!confirm(`Excluir carimbo "${s.titulo}"?`)) return;
+    const okAnswer = await confirm({
+      title: `Excluir carimbo "${s.titulo}"?`,
+      message:
+        'Os carimbos ja concedidos para este item serao perdidos. Use isso so antes de comecar o evento ou se ainda nao houver carimbos registrados.',
+      confirmLabel: 'Excluir carimbo',
+    });
+    if (!okAnswer) return;
     try {
       await api(`/events/${event.id}/passport/stamps/${s.id}`, { method: 'DELETE' });
+      setOk(`Carimbo "${s.titulo}" excluido.`);
       await load();
     } catch (e) {
       setErr((e as Error).message);

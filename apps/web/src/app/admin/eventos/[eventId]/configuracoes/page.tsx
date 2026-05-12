@@ -6,6 +6,7 @@ import type { Route } from 'next';
 import type { EventStatus } from '@eventpass/shared';
 import { api } from '../../../../../lib/api';
 import { useEventFromParams } from '../../../../../lib/use-event-from-params';
+import { useConfirm } from '../../../../../components/confirm-modal';
 import {
   Button,
   ErrorBanner,
@@ -37,6 +38,7 @@ const STATUSES: { value: EventStatus; label: string; hint: string }[] = [
 export default function EventSettingsPage() {
   const router = useRouter();
   const { event, reload } = useEventFromParams();
+  const confirm = useConfirm();
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
   const [status, setStatus] = useState<EventStatus>('DRAFT');
@@ -85,12 +87,13 @@ export default function EventSettingsPage() {
 
   async function remove() {
     if (!event) return;
-    if (
-      !confirm(
-        `Excluir definitivamente o evento "${event.nome}"? Todos os dados associados serao perdidos.`,
-      )
-    )
-      return;
+    const okAnswer = await confirm({
+      title: `Excluir "${event.nome}"?`,
+      message:
+        'Empresas, participantes, carimbos e avaliacoes deste evento serao perdidos. Esta acao nao pode ser desfeita.',
+      confirmLabel: 'Excluir evento',
+    });
+    if (!okAnswer) return;
     setDeleting(true);
     setErr(null);
     try {
