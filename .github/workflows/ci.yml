@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancela runs antigas do mesmo PR/branch quando uma nova chega.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint + Typecheck + Test
+    runs-on: ubuntu-latest
+
+    # Postgres + Redis sao necessarios pelo Prisma e por testes que toquem
+    # core/redis no apps/api. Versoes alinhadas com docker-compose.yml.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: eventpass
+          POSTGRES_PASSWORD: eventpass_dev_password
+          POSTGRES_DB: eventpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eventpass -d eventpass"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://eventpass:eventpass_dev_password@localhost:5432/eventpass?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci-only-access-secret-with-at-least-32-chars-padding
+      JWT_REFRESH_SECRET: ci-only-refresh-secret-with-at-least-32-chars-padding
+      JWT_QR_SECRET: ci-only-qr-secret-with-at-least-32-chars-padding
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 7d
+      JWT_QR_TTL: 30s
+      NODE_ENV: test
+      API_PORT: 3001
+      WEB_PORT: 3000
+      API_URL: http://localhost:3001
+      WEB_URL: http://localhost:3000
+      CORS_ORIGIN: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build @eventpass/shared
+        # Necessario antes do typecheck do web/api porque ambos importam tipos
+        # construidos do package compartilhado.
+        run: pnpm shared:build
+
+      - name: Generate Prisma client
+        working-directory: apps/api
+        run: pnpm prisma generate
+
+      - name: Apply database migrations
+        working-directory: apps/api
+        run: pnpm prisma migrate deploy
+
+      - name: Typecheck (workspace inteiro)
+        run: pnpm -r typecheck
+
+      # Lint desligado por enquanto: apps/api esta sem eslint.config.js
+      # (ESLint 9 nao aceita .eslintrc) e apps/web usa `next lint`
+      # deprecated. Tech debt registrado em EventPass/05 (Obsidian).
+      # - name: Lint
+      #   run: pnpm -r lint
+
+      - name: Test
+        run: pnpm -r test
