@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { Route } from 'next';
 import { clsx } from 'clsx';
-import { api } from '../../../lib/api';
+import { Award } from 'lucide-react';
+import type { CertificateDto } from '@eventpass/shared';
+import { api, ApiError } from '../../../lib/api';
 import { useActiveEvent } from '../../../lib/use-active-event';
 
 interface PassportStatus {
@@ -26,10 +29,31 @@ interface PassportStatus {
 }
 
 export default function PassportPage() {
+  const router = useRouter();
   const { event, loading: eventLoading } = useActiveEvent();
   const [status, setStatus] = useState<PassportStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [certLoading, setCertLoading] = useState(false);
+  const [certErr, setCertErr] = useState<string | null>(null);
+
+  async function emitirCertificado() {
+    if (!event) return;
+    setCertLoading(true);
+    setCertErr(null);
+    try {
+      const cert = await api<CertificateDto>(
+        `/events/${event.id}/passport/me/certificate`,
+        { method: 'POST' },
+      );
+      router.push(`/certificado/${cert.code}` as Route);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : (e as Error).message;
+      setCertErr(msg);
+    } finally {
+      setCertLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (!event) return;
@@ -94,9 +118,31 @@ export default function PassportPage() {
           />
         </div>
         {status.completed && (
-          <p className="mt-3 text-sm font-semibold text-emerald-700">
-            Parabens! Voce concluiu todos os carimbos e esta apto ao certificado.
-          </p>
+          <div className="mt-3 flex flex-col gap-2 rounded-lg bg-emerald-50 p-3">
+            <p className="text-sm font-semibold text-emerald-800">
+              Parabens! Voce concluiu todos os carimbos obrigatorios.
+            </p>
+            {event?.modules.includes('certificate') ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void emitirCertificado()}
+                  disabled={certLoading}
+                  className="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition active:scale-[0.98] disabled:opacity-60"
+                >
+                  <Award size={16} />
+                  {certLoading ? 'Emitindo certificado...' : 'Emitir certificado'}
+                </button>
+                {certErr && (
+                  <p className="text-xs font-medium text-red-700">{certErr}</p>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-emerald-700">
+                Aguarde a organizacao habilitar o modulo de certificado para baixar.
+              </p>
+            )}
+          </div>
         )}
       </div>
 

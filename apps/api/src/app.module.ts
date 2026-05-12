@@ -14,6 +14,7 @@ import { EventsModule } from './modules/events/events.module';
 import { UsersModule } from './modules/users/users.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { PassportModule } from './modules/passport/passport.module';
+import { CertificateModule } from './modules/certificate/certificate.module';
 import { ScanModule } from './modules/scan/scan.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -42,6 +43,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     UsersModule,
     CompaniesModule,
     PassportModule,
+    CertificateModule,
     ScanModule,
     FeedbackModule,
     DashboardModule,

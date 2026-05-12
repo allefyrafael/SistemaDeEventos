@@ -80,6 +80,7 @@ model User {
   avaliacoes            Evaluation[]           @relation("StudentOfEvaluation")
   auditLogs             AuditLog[]
   activityRegistrations ActivityRegistration[]
+  certificates          Certificate[]
 
   @@index([tipoPerfil])
   @@map("users")
@@ -120,6 +121,7 @@ model Event {
   venueMap      VenueMap?
   mapLocations  MapLocation[]
   activities    Activity[]
+  certificates  Certificate[]
 
   @@index([status, startsAt])
   @@map("events")
@@ -389,6 +391,28 @@ model ActivityRegistration {
   @@unique([activityId, userId])
   @@index([userId])
   @@map("activity_registrations")
+}
+
+// ------------------------------------------------------------
+// Certificate (modulo "certificate")
+// Emitido para participantes que concluem 100% dos itens obrigatorios
+// do passaporte. Acesso publico via `code` curto/aleatorio — qualquer
+// pessoa com o codigo pode validar o certificado.
+// ------------------------------------------------------------
+
+model Certificate {
+  id          String   @id @default(uuid(7))
+  eventId     String
+  studentId   String
+  code        String   @unique               // codigo publico curto (~10 chars)
+  generatedAt DateTime @default(now())
+
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  student     User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, studentId])             // 1 certificado por aluno por evento
+  @@index([generatedAt])
+  @@map("certificates")
 }
 
 // ------------------------------------------------------------

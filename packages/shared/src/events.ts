@@ -134,10 +134,10 @@ export const FEATURE_MODULE_META: Record<FeatureModule, FeatureModuleMeta> = {
     label: 'Certificado digital',
     shortDescription: 'Gera certificado automatico para concludentes.',
     fullDescription:
-      'Ao completar o passaporte o participante recebe um certificado digital em PDF com validacao por codigo. Requer o modulo Passaporte ativo. (Funcionalidade em implementacao.)',
+      'Ao completar 100% dos itens obrigatorios do passaporte (com feedback respondido), o participante baixa um certificado digital em HTML imprimivel com codigo de validacao publica e QR para verificacao. Requer o modulo Passaporte ativo.',
     category: 'participante',
     requires: ['passport'],
-    defaultEnabled: false,
+    defaultEnabled: true,
   },
   check_in: {
     id: 'check_in',

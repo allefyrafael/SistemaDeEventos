@@ -9,3 +9,4 @@ export * from './users';
 export * from './dashboard';
 export * from './scan';
 export * from './venue-map';
+export * from './certificate';
