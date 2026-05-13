@@ -26,6 +26,14 @@ interface AuthContextValue {
     senha: string;
     eventId: string;
   }) => Promise<AuthUser>;
+  registerStudent: (input: {
+    matricula: string;
+    nome: string;
+    cpf: string;
+    email: string;
+    senha: string;
+    eventId: string;
+  }) => Promise<AuthUser>;
   logout: () => Promise<void>;
 }
 
@@ -85,6 +93,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+  const registerStudent = useCallback(
+    async (input: {
+      matricula: string;
+      nome: string;
+      cpf: string;
+      email: string;
+      senha: string;
+      eventId: string;
+    }) => {
+      const resp = await api<AuthTokens>('/auth/register/estudante', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+      setTokens(resp);
+      setUser(resp.user);
+      return resp.user;
+    },
+    [],
+  );
 
   const logout = useCallback(async () => {
     const t = getTokens();
@@ -113,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginStudent,
         loginVisitor,
         registerVisitor,
+        registerStudent,
         logout,
       }}
     >

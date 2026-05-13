@@ -4,11 +4,13 @@ import {
   adminLoginSchema,
   companyLoginSchema,
   studentLoginSchema,
+  studentRegisterSchema,
   visitorLoginSchema,
   visitorRegisterSchema,
   type AdminLoginInput,
   type CompanyLoginInput,
   type StudentLoginInput,
+  type StudentRegisterInput,
   type VisitorLoginInput,
   type VisitorRegisterInput,
 } from '@eventpass/shared';
@@ -64,6 +66,15 @@ export class AuthController {
     @Body(new ZodValidationPipe(visitorRegisterSchema)) dto: VisitorRegisterInput,
   ) {
     return this.auth.registerVisitor(dto);
+  }
+
+  @Public()
+  @Post('register/estudante')
+  @HttpCode(201)
+  registerStudent(
+    @Body(new ZodValidationPipe(studentRegisterSchema)) dto: StudentRegisterInput,
+  ) {
+    return this.auth.registerStudent(dto);
   }
 
   @Public()

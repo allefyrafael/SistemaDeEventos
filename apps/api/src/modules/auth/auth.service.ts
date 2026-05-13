@@ -18,6 +18,7 @@ import type {
   AdminLoginInput,
   CompanyLoginInput,
   StudentLoginInput,
+  StudentRegisterInput,
   VisitorLoginInput,
   VisitorRegisterInput,
 } from '@eventpass/shared';
@@ -161,6 +162,91 @@ export class AuthService {
           senhaHash,
           tipoPerfil: UserType.STUDENT,
           studentKind: StudentKind.EXTERNAL,
+        },
+      });
+      userId = created.id;
+      userNome = created.nome;
+    }
+
+    await this.prisma.eventMember.upsert({
+      where: {
+        eventId_userId_role: {
+          eventId: event.id,
+          userId,
+          role: EventMemberRole.STUDENT,
+        },
+      },
+      update: {},
+      create: { eventId: event.id, userId, role: EventMemberRole.STUDENT },
+    });
+
+    return this.issueTokens(userId, 'STUDENT', userNome);
+  }
+
+  /**
+   * Auto-cadastro de ESTUDANTE INTERNO (institucional). Matricula no padrao
+   * UC########, cria User STUDENT/INTERNAL com bcrypt e associa ao evento.
+   * Idempotente: re-registro do mesmo CPF (ja interno) atualiza dados.
+   *
+   * NAO valida a matricula contra base externa — assume confianca + auditoria
+   * posterior pelo admin. Se admin importou via CSV (legado, sem senha), o
+   * re-registro com este endpoint adiciona a senha sem perder progresso.
+   */
+  async registerStudent(input: StudentRegisterInput): Promise<LoginResponse> {
+    const event = await this.prisma.event.findUnique({ where: { id: input.eventId } });
+    if (!event) throw new NotFoundException('Evento nao encontrado');
+    if (event.status !== EventStatus.PUBLISHED && event.status !== EventStatus.RUNNING) {
+      throw new ForbiddenException('Evento nao esta aceitando cadastros');
+    }
+
+    // Garante que a matricula nao colide com outro CPF.
+    const existingByMatricula = await this.prisma.user.findUnique({
+      where: { matricula: input.matricula },
+    });
+    if (existingByMatricula && existingByMatricula.cpf !== input.cpf) {
+      throw new ConflictException(
+        'Matricula ja vinculada a outro CPF. Procure a equipe da organizacao.',
+      );
+    }
+
+    const existing = await this.prisma.user.findUnique({ where: { cpf: input.cpf } });
+    const senhaHash = await this.hashPassword(input.senha);
+
+    let userId: string;
+    let userNome: string;
+
+    if (existing) {
+      if (existing.tipoPerfil !== UserType.STUDENT) {
+        throw new ConflictException('CPF ja cadastrado com outro perfil');
+      }
+      if (existing.studentKind === StudentKind.EXTERNAL) {
+        throw new ConflictException(
+          'CPF ja cadastrado como visitante externo. Faca login pela rota de visitante.',
+        );
+      }
+      // INTERNAL existente (legado importado por CSV ou re-registro): atualiza
+      // dados e ADICIONA/atualiza senha.
+      const updated = await this.prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          nome: input.nome,
+          email: input.email,
+          matricula: input.matricula,
+          senhaHash,
+        },
+      });
+      userId = updated.id;
+      userNome = updated.nome;
+    } else {
+      const created = await this.prisma.user.create({
+        data: {
+          nome: input.nome,
+          cpf: input.cpf,
+          email: input.email,
+          matricula: input.matricula,
+          senhaHash,
+          tipoPerfil: UserType.STUDENT,
+          studentKind: StudentKind.INTERNAL,
         },
       });
       userId = created.id;

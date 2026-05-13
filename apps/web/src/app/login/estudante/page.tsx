@@ -89,13 +89,14 @@ export default function StudentLoginPage() {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {mode === 'aluno' ? (
           <>
-            <Field label="Matricula">
+            <Field label="Matricula" hint="Padrao UC + 8 digitos (ex: UC24101130)">
               <TextInput
                 type="text"
-                inputMode="numeric"
-                placeholder="Ex: 202600001"
+                placeholder="UC24101130"
                 value={matricula}
-                onChange={(e) => setMatricula(e.target.value)}
+                onChange={(e) => setMatricula(e.target.value.toUpperCase())}
+                maxLength={10}
+                autoCapitalize="characters"
                 required
               />
             </Field>

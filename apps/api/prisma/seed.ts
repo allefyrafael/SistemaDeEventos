@@ -169,10 +169,10 @@ async function main() {
     }
   }
 
-  // 5) Dois estudantes demo (internos com matricula)
+  // 5) Dois estudantes demo (internos com matricula no padrao UC########)
   const alunos = [
-    { matricula: '202600001', cpf: '33333333333', nome: 'Aluno Demo 1', email: 'aluno1@demo.com' },
-    { matricula: '202600002', cpf: '44444444444', nome: 'Aluno Demo 2', email: 'aluno2@demo.com' },
+    { matricula: 'UC24101130', cpf: '33333333333', nome: 'Aluno Demo 1', email: 'aluno1@demo.com' },
+    { matricula: 'UC24101131', cpf: '44444444444', nome: 'Aluno Demo 2', email: 'aluno2@demo.com' },
   ];
   for (const a of alunos) {
     const u = await prisma.user.upsert({
@@ -203,7 +203,7 @@ async function main() {
   console.log('>> Seed done');
   console.log('--- Credenciais para teste ---');
   console.log(`  ADMIN:     CPF ${DEMO_ADMIN_CPF} / senha ${DEMO_ADMIN_SENHA}`);
-  console.log('  ESTUDANTE: matricula 202600001 / CPF 33333333333');
+  console.log('  ESTUDANTE: matricula UC24101130 / CPF 33333333333');
   console.log('  EMPRESA:   cpfEmpresa 11111111111 + cpfResponsavel 11111111112 (TechCo)');
   console.log('             cpfEmpresa 22222222222 + cpfResponsavel 22222222223 (Carreiras Hub)');
 }
