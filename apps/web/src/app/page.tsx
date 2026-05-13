@@ -1,13 +1,30 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { PublicEvent } from '@eventpass/shared';
 import { useAuth } from '../lib/auth-context';
+import { api } from '../lib/api';
 
 export default function HomePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [activeEvent, setActiveEvent] = useState<PublicEvent | null | undefined>(undefined);
+
+  // Pega o primeiro evento publico (RUNNING > PUBLISHED) para mostrar o
+  // branding institucional sem precisar de auth. Plataforma = EventPass;
+  // a "marca" do dia (UCB Eventos, etc.) vem desse evento ativo.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const rows = await api<PublicEvent[]>('/events/public');
+        setActiveEvent(rows[0] ?? null);
+      } catch {
+        setActiveEvent(null);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -16,8 +33,6 @@ export default function HomePage() {
     else router.replace('/estudante');
   }, [user, loading, router]);
 
-  // Evita piscar os CTAs durante a checagem inicial de sessao ou enquanto o
-  // useEffect acima ainda nao redirecionou um usuario logado.
   if (loading || user) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-3 p-6">
@@ -27,18 +42,43 @@ export default function HomePage() {
     );
   }
 
+  const publisher = activeEvent?.branding?.publisher;
+  const tagline = activeEvent?.branding?.tagline ?? activeEvent?.descricao ?? undefined;
+  const footer = activeEvent?.branding?.footer;
+
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 p-6">
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-brand-primary">EventPass</h1>
-        <p className="mt-2 text-slate-600">Passaporte digital para eventos</p>
+        {publisher ? (
+          <>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              {publisher}
+            </p>
+            <h1 className="mt-2 text-3xl font-bold text-brand-primary">
+              {activeEvent?.nome ?? 'EventPass'}
+            </h1>
+            {tagline && (
+              <p className="mt-2 text-sm text-slate-600">{tagline}</p>
+            )}
+          </>
+        ) : (
+          <>
+            <h1 className="text-4xl font-bold text-brand-primary">
+              {activeEvent?.nome ?? 'EventPass'}
+            </h1>
+            <p className="mt-2 text-slate-600">
+              {tagline ?? 'Passaporte digital para eventos'}
+            </p>
+          </>
+        )}
       </div>
+
       <div className="flex w-full flex-col gap-3">
         <Link
           className="rounded-xl bg-brand-primary px-4 py-4 text-center font-semibold text-white shadow-sm active:scale-[0.98]"
           href="/login/estudante"
         >
-          Sou participante
+          Sou estudante
         </Link>
         <Link
           className="rounded-xl border-2 border-brand-primary px-4 py-4 text-center font-semibold text-brand-primary active:scale-[0.98]"
@@ -54,13 +94,14 @@ export default function HomePage() {
         </Link>
         <Link
           className="text-center text-sm font-medium text-slate-500 underline-offset-2 hover:underline"
-          href="/cadastro/visitante"
+          href="/cadastro"
         >
-          Visitante externo? Crie seu cadastro
+          Nao tenho cadastro
         </Link>
       </div>
+
       <p className="text-center text-xs text-slate-400">
-        Plataforma modular para organizacao de eventos
+        {footer ?? 'Plataforma modular para organizacao de eventos'}
       </p>
     </main>
   );

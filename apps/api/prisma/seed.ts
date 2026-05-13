@@ -49,6 +49,14 @@ async function main() {
           'certificate',
         ],
         theme: { primary: '#0057A3' },
+        // Branding textual da instituicao organizadora — aparece na home
+        // publica e nas telas de cadastro. Demonstra como reutilizar a
+        // plataforma para qualquer instituicao.
+        branding: {
+          publisher: 'UCB Eventos',
+          tagline: 'Feira de Carreiras · Passaporte Digital',
+          footer: 'Universidade Catolica de Brasilia',
+        },
         passport: { requiredStamps: 3 },
         qr_scan: { tokenTtlSeconds: 30, rotateEverySeconds: 20 },
         feedback: { mandatory: true, minQuestions: 3 },

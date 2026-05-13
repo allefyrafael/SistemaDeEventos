@@ -126,30 +126,49 @@ export class EventsService {
   }
 
   /**
-   * Lista publica (sem auth) usada no auto-cadastro de visitantes externos.
-   * Retorna apenas eventos PUBLISHED ou RUNNING, com campos seguros.
+   * Lista publica (sem auth) usada na home e no auto-cadastro de
+   * visitantes/estudantes. Retorna apenas eventos PUBLISHED ou RUNNING,
+   * com campos seguros + branding parseado do config (publisher/tagline/
+   * footer) para a home renderizar o tema da instituicao organizadora
+   * sem expor o resto da config.
    */
   async listPublic() {
     const rows = await this.prisma.event.findMany({
       where: { status: { in: [EventStatus.PUBLISHED, EventStatus.RUNNING] } },
-      orderBy: { startsAt: 'asc' },
+      // RUNNING primeiro pra home pegar o evento ativo se houver,
+      // depois PUBLISHED por proximidade da data de inicio.
+      orderBy: [{ status: 'desc' }, { startsAt: 'asc' }],
       select: {
         id: true,
         nome: true,
         slug: true,
         descricao: true,
+        status: true,
         startsAt: true,
         endsAt: true,
+        config: true,
       },
     });
-    return rows.map((r) => ({
-      id: r.id,
-      nome: r.nome,
-      slug: r.slug,
-      descricao: r.descricao,
-      startsAt: r.startsAt.toISOString(),
-      endsAt: r.endsAt.toISOString(),
-    }));
+    return rows.map((r) => {
+      const cfg = (r.config ?? {}) as { branding?: Record<string, string | undefined> };
+      const branding = cfg.branding
+        ? {
+            publisher: cfg.branding.publisher,
+            tagline: cfg.branding.tagline,
+            footer: cfg.branding.footer,
+          }
+        : null;
+      return {
+        id: r.id,
+        nome: r.nome,
+        slug: r.slug,
+        descricao: r.descricao,
+        status: r.status,
+        startsAt: r.startsAt.toISOString(),
+        endsAt: r.endsAt.toISOString(),
+        branding,
+      };
+    });
   }
 
   async toggleModule(

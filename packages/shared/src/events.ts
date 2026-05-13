@@ -28,6 +28,21 @@ export const eventConfigSchema = z.object({
     })
     .partial()
     .optional(),
+  /**
+   * Branding textual do evento. Aparece na home publica (`/`) e em telas
+   * publicas como `/cadastro/*`. Permite reutilizar a plataforma EventPass
+   * para varias instituicoes — cada evento configura seu publisher
+   * (ex: "UCB Eventos"), tagline (ex: "Feira de Carreiras · Passaporte
+   * Digital") e footer (ex: "Universidade Catolica de Brasilia").
+   */
+  branding: z
+    .object({
+      publisher: z.string().max(80).optional(),
+      tagline: z.string().max(160).optional(),
+      footer: z.string().max(120).optional(),
+    })
+    .partial()
+    .optional(),
   passport: z
     .object({
       requiredStamps: z.number().int().positive().optional(),
@@ -254,14 +269,24 @@ export const eventSummarySchema = z.object({
 });
 export type EventSummary = z.infer<typeof eventSummarySchema>;
 
-// Versao publica (sem auth) usada na tela de auto-cadastro de visitantes:
-// expoe somente eventos PUBLISHED ou RUNNING e campos seguros.
+// Versao publica (sem auth) usada na tela de auto-cadastro de visitantes
+// e na home (branding dinamico): expoe somente eventos PUBLISHED ou
+// RUNNING e campos seguros. Inclui status para a home destacar eventos
+// em andamento, e branding pra reutilizacao da plataforma.
 export const publicEventSchema = z.object({
   id: z.string(),
   nome: z.string(),
   slug: z.string(),
   descricao: z.string().nullable(),
+  status: eventStatusSchema,
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime(),
+  branding: z
+    .object({
+      publisher: z.string().optional(),
+      tagline: z.string().optional(),
+      footer: z.string().optional(),
+    })
+    .nullable(),
 });
 export type PublicEvent = z.infer<typeof publicEventSchema>;
