@@ -7,12 +7,14 @@ import {
   studentRegisterSchema,
   visitorLoginSchema,
   visitorRegisterSchema,
+  volunteerLoginSchema,
   type AdminLoginInput,
   type CompanyLoginInput,
   type StudentLoginInput,
   type StudentRegisterInput,
   type VisitorLoginInput,
   type VisitorRegisterInput,
+  type VolunteerLoginInput,
 } from '@eventpass/shared';
 import { z } from 'zod';
 
@@ -60,6 +62,13 @@ export class AuthController {
   }
 
   @Public()
+  @Post('login/voluntario')
+  @HttpCode(200)
+  loginVolunteer(@Body(new ZodValidationPipe(volunteerLoginSchema)) dto: VolunteerLoginInput) {
+    return this.auth.loginVolunteer(dto);
+  }
+
+  @Public()
   @Post('register/visitante')
   @HttpCode(201)
   registerVisitor(
@@ -94,5 +103,15 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: AuthenticatedUser) {
     return user;
+  }
+
+  /**
+   * Retorna a lista de eventos em que o usuario logado e voluntario,
+   * com os escopos (VOLUNTEER_STUDENTS / VOLUNTEER_COMPANIES) de cada um.
+   * Usado pelo dashboard `/voluntario` para mostrar acoes disponiveis.
+   */
+  @Get('me/volunteer-scopes')
+  async myVolunteerScopes(@CurrentUser() user: AuthenticatedUser) {
+    return this.auth.listVolunteerScopes(user.id);
   }
 }

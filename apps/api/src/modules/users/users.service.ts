@@ -252,6 +252,36 @@ export class UsersService {
     return user;
   }
 
+  /**
+   * Reset administrativo de senha de estudante. Verifica que o user
+   * realmente e estudante do evento informado antes de sobrescrever
+   * — evita reset cruzado entre eventos. Quem chama:
+   * - admin global (validacao do guard), OU
+   * - Voluntario Estudantes do evento (validado no controller).
+   */
+  async resetStudentSenha(
+    eventId: string,
+    userId: string,
+    novaSenha: string,
+  ): Promise<void> {
+    const member = await this.prisma.eventMember.findFirst({
+      where: {
+        eventId,
+        userId,
+        role: EventMemberRole.STUDENT,
+      },
+      include: { user: { select: { tipoPerfil: true } } },
+    });
+    if (!member || member.user.tipoPerfil !== UserType.STUDENT) {
+      throw new NotFoundException('Estudante nao encontrado neste evento');
+    }
+    const senhaHash = await this.auth.hashPassword(novaSenha);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { senhaHash },
+    });
+  }
+
   async listEventStudents(eventId: string) {
     return this.prisma.user.findMany({
       where: {

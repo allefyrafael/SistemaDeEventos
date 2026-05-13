@@ -8,6 +8,7 @@ import {
   Building2,
   Download,
   FileText,
+  HandHelping,
   LayoutDashboard,
   Map as MapIcon,
   ScanLine,
@@ -72,6 +73,12 @@ const TABS: TabDef[] = [
     label: 'Participantes',
     icon: UsersIcon,
     description: 'Importacao e listagem de participantes.',
+  },
+  {
+    segment: 'voluntarios',
+    label: 'Voluntarios',
+    icon: HandHelping,
+    description: 'Equipe que ajuda na gestao de estudantes e empresas no evento.',
   },
   {
     segment: 'stamps',

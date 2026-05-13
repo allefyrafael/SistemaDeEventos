@@ -19,6 +19,7 @@ interface AuthContextValue {
   loginCompany: (cpf: string, senha: string) => Promise<AuthUser>;
   loginStudent: (matricula: string, cpf: string) => Promise<AuthUser>;
   loginVisitor: (cpf: string, senha: string) => Promise<AuthUser>;
+  loginVolunteer: (cpf: string, senha: string) => Promise<AuthUser>;
   registerVisitor: (input: {
     nome: string;
     cpf: string;
@@ -80,6 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (cpf: string, senha: string) => doLogin('/auth/login/visitante', { cpf, senha }),
     [doLogin],
   );
+  const loginVolunteer = useCallback(
+    (cpf: string, senha: string) => doLogin('/auth/login/voluntario', { cpf, senha }),
+    [doLogin],
+  );
   const registerVisitor = useCallback(
     async (input: { nome: string; cpf: string; email: string; senha: string; eventId: string }) => {
       const resp = await api<AuthTokens>('/auth/register/visitante', {
@@ -138,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginCompany,
         loginStudent,
         loginVisitor,
+        loginVolunteer,
         registerVisitor,
         registerStudent,
         logout,

@@ -24,6 +24,7 @@ enum UserType {
   ADMIN
   COMPANY
   STUDENT
+  VOLUNTEER   // perfil global; permissoes especificas vivem em EventMember.role
 }
 
 enum EventStatus {
@@ -38,6 +39,10 @@ enum EventMemberRole {
   ADMIN
   COMPANY_REP
   STUDENT
+  // Voluntarios sao contextuais por evento — mesma pessoa pode ser
+  // voluntaria em A e nao em B. Subdividem em dois escopos:
+  VOLUNTEER_STUDENTS    // gerencia estudantes (reset de senha)
+  VOLUNTEER_COMPANIES   // gerencia empresas (cadastro + reset senha do responsavel)
 }
 
 enum StudentKind {

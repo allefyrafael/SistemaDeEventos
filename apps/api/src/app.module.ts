@@ -20,6 +20,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ExportsModule } from './modules/exports/exports.module';
 import { VenueMapModule } from './modules/venue-map/venue-map.module';
+import { VolunteersModule } from './modules/volunteers/volunteers.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
@@ -49,6 +50,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     DashboardModule,
     ExportsModule,
     VenueMapModule,
+    VolunteersModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

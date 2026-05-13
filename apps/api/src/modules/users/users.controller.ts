@@ -13,9 +13,11 @@ import { UserType } from '@prisma/client';
 import {
   adminCreateSchema,
   externalStudentSignupSchema,
+  senhaResetSchema,
   studentProfileUpdateSchema,
   type AdminCreateInput,
   type ExternalStudentSignupInput,
+  type SenhaResetInput,
   type StudentProfileUpdateInput,
 } from '@eventpass/shared';
 import { z } from 'zod';
@@ -27,6 +29,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { VolunteersService } from '../volunteers/volunteers.service';
 import { UsersService } from './users.service';
 
 const csvImportSchema = z.object({
@@ -38,6 +41,7 @@ export class UsersController {
   constructor(
     private readonly users: UsersService,
     private readonly membership: EventMembershipService,
+    private readonly volunteers: VolunteersService,
   ) {}
 
   @Get('admins')
@@ -65,9 +69,38 @@ export class UsersController {
   }
 
   @Get('events/:eventId/students')
-  @Roles(UserType.ADMIN)
-  listStudents(@Param('eventId', new ParseUUIDPipe()) eventId: string) {
+  @Roles(UserType.ADMIN, UserType.VOLUNTEER)
+  async listStudents(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+  ) {
+    await this.volunteers.assertScopeInEvent(
+      { id: actor.id, tipoPerfil: actor.tipoPerfil },
+      eventId,
+      'VOLUNTEER_STUDENTS',
+    );
     return this.users.listEventStudents(eventId);
+  }
+
+  /**
+   * Reset administrativo de senha de estudante: admin global ou
+   * Voluntario Estudantes do evento. O Voluntario Estudantes NUNCA
+   * visualiza a senha atual (so atribui nova).
+   */
+  @Patch('events/:eventId/students/:userId/senha')
+  @Roles(UserType.ADMIN, UserType.VOLUNTEER)
+  async resetStudentSenha(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Param('userId', new ParseUUIDPipe()) userId: string,
+    @Body(new ZodValidationPipe(senhaResetSchema)) dto: SenhaResetInput,
+  ) {
+    await this.volunteers.assertScopeInEvent(
+      { id: actor.id, tipoPerfil: actor.tipoPerfil },
+      eventId,
+      'VOLUNTEER_STUDENTS',
+    );
+    await this.users.resetStudentSenha(eventId, userId, dto.novaSenha);
   }
 
   // Cadastro manual de visitante externo - publico para suportar self-signup.

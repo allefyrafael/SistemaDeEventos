@@ -30,6 +30,7 @@ export default function HomePage() {
     if (loading || !user) return;
     if (user.tipoPerfil === 'ADMIN') router.replace('/admin');
     else if (user.tipoPerfil === 'COMPANY') router.replace('/empresa');
+    else if (user.tipoPerfil === 'VOLUNTEER') router.replace('/voluntario');
     else router.replace('/estudante');
   }, [user, loading, router]);
 
@@ -97,6 +98,12 @@ export default function HomePage() {
           href="/cadastro"
         >
           Nao tenho cadastro
+        </Link>
+        <Link
+          className="text-center text-xs font-medium text-slate-400 underline-offset-2 hover:underline"
+          href="/login/voluntario"
+        >
+          Sou voluntario do evento
         </Link>
       </div>
 

@@ -25,6 +25,7 @@ import { ZodValidationPipe } from '../../core/pipes/zod-validation.pipe';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { VolunteersService } from '../volunteers/volunteers.service';
 import { CompaniesService } from './companies.service';
 
 const logoSchema = z.object({ logoKey: z.string().max(300).nullable() });
@@ -34,6 +35,7 @@ export class CompaniesController {
   constructor(
     private readonly companies: CompaniesService,
     private readonly membership: EventMembershipService,
+    private readonly volunteers: VolunteersService,
   ) {}
 
   @Get()
@@ -56,11 +58,18 @@ export class CompaniesController {
   }
 
   @Post()
-  @Roles(UserType.ADMIN)
-  create(
+  @Roles(UserType.ADMIN, UserType.VOLUNTEER)
+  async create(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('eventId', new ParseUUIDPipe()) eventId: string,
     @Body(new ZodValidationPipe(companyCreateSchema)) dto: CompanyCreateInput,
   ) {
+    // Voluntario Empresas pode cadastrar; admin global tambem pode.
+    await this.volunteers.assertScopeInEvent(
+      { id: user.id, tipoPerfil: user.tipoPerfil },
+      eventId,
+      'VOLUNTEER_COMPANIES',
+    );
     return this.companies.create(eventId, dto);
   }
 
@@ -90,15 +99,21 @@ export class CompaniesController {
    * responsavel esquece a senha ou precisa de senha inicial.
    */
   @Patch(':companyId/responsaveis/:userId/senha')
-  @Roles(UserType.ADMIN)
+  @Roles(UserType.ADMIN, UserType.VOLUNTEER)
   @HttpCode(204)
   async resetResponsavelSenha(
+    @CurrentUser() actor: AuthenticatedUser,
     @Param('eventId', new ParseUUIDPipe()) eventId: string,
     @Param('companyId', new ParseUUIDPipe()) companyId: string,
     @Param('userId', new ParseUUIDPipe()) userId: string,
     @Body(new ZodValidationPipe(responsavelSenhaResetSchema))
     dto: ResponsavelSenhaResetInput,
   ) {
+    await this.volunteers.assertScopeInEvent(
+      { id: actor.id, tipoPerfil: actor.tipoPerfil },
+      eventId,
+      'VOLUNTEER_COMPANIES',
+    );
     await this.companies.resetResponsavelSenha(
       eventId,
       companyId,

@@ -91,5 +91,54 @@ export const studentRegisterSchema = z.object({
 });
 export type StudentRegisterInput = z.infer<typeof studentRegisterSchema>;
 
-export const userTypeSchema = z.enum(['ADMIN', 'COMPANY', 'STUDENT']);
+export const userTypeSchema = z.enum(['ADMIN', 'COMPANY', 'STUDENT', 'VOLUNTEER']);
 export type UserType = z.infer<typeof userTypeSchema>;
+
+/**
+ * Escopo do voluntario DENTRO de um evento. Uma mesma pessoa pode ser
+ * voluntaria de estudantes em um evento e de empresas em outro — por isso
+ * vive em EventMember.role, nao em User.tipoPerfil.
+ */
+export const volunteerScopeSchema = z.enum(['VOLUNTEER_STUDENTS', 'VOLUNTEER_COMPANIES']);
+export type VolunteerScope = z.infer<typeof volunteerScopeSchema>;
+
+/**
+ * Login de voluntario: CPF + senha pessoal, mesmo padrao do admin/empresa.
+ * Permissoes especificas vem do EventMember.role no evento ativo.
+ */
+export const volunteerLoginSchema = z.object({
+  cpf: cpfSchema,
+  senha: z.string().min(8, 'Senha minima de 8 caracteres'),
+});
+export type VolunteerLoginInput = z.infer<typeof volunteerLoginSchema>;
+
+/**
+ * Cadastro de voluntario por admin do evento. `scope` define se ele
+ * gerencia estudantes ou empresas neste evento (ou ambos, com 2 cadastros).
+ */
+export const volunteerCreateSchema = z.object({
+  nome: z.string().trim().min(3, 'Nome muito curto').max(120),
+  cpf: cpfSchema,
+  email: z.string().email('Email invalido').max(120),
+  senha: z.string().min(8, 'Senha minima de 8 caracteres').max(72),
+  scope: volunteerScopeSchema,
+});
+export type VolunteerCreateInput = z.infer<typeof volunteerCreateSchema>;
+
+/** Reset administrativo de senha de qualquer usuario (estudante/empresa/voluntario). */
+export const senhaResetSchema = z.object({
+  novaSenha: z.string().min(8, 'Senha minima de 8 caracteres').max(72),
+});
+export type SenhaResetInput = z.infer<typeof senhaResetSchema>;
+
+/** Item retornado por GET /events/:id/volunteers. */
+export const volunteerDtoSchema = z.object({
+  id: z.string().uuid(),
+  nome: z.string(),
+  cpf: z.string(),
+  email: z.string().email().nullable(),
+  scope: volunteerScopeSchema,
+  ativo: z.boolean(),
+  createdAt: z.string().datetime(),
+});
+export type VolunteerDto = z.infer<typeof volunteerDtoSchema>;

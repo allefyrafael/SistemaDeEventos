@@ -1,7 +1,7 @@
 // Storage simples de tokens. Em producao trocar por cookie httpOnly com refresh no servidor.
 // Por enquanto localStorage atende o escopo PWA e permite dev rapido.
 
-export type UserType = 'ADMIN' | 'COMPANY' | 'STUDENT';
+export type UserType = 'ADMIN' | 'COMPANY' | 'STUDENT' | 'VOLUNTEER';
 
 export interface AuthUser {
   id: string;

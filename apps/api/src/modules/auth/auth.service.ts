@@ -21,6 +21,7 @@ import type {
   StudentRegisterInput,
   VisitorLoginInput,
   VisitorRegisterInput,
+  VolunteerLoginInput,
 } from '@eventpass/shared';
 import type {
   AuthenticatedUser,
@@ -283,9 +284,41 @@ export class AuthService {
   // Token issuance + refresh rotation
   // ---------------------------------------------------------
 
+  /**
+   * Login de voluntario: CPF + senha. Aceita apenas users com
+   * tipoPerfil = VOLUNTEER + ao menos um EventMember VOLUNTEER_* ativo.
+   * As permissoes contextuais (estudantes vs empresas) sao resolvidas
+   * por evento via EventMembershipService nos controllers.
+   */
+  async loginVolunteer(input: VolunteerLoginInput): Promise<LoginResponse> {
+    const user = await this.prisma.user.findUnique({
+      where: { cpf: input.cpf },
+      include: {
+        eventMembers: {
+          where: {
+            role: { in: [EventMemberRole.VOLUNTEER_STUDENTS, EventMemberRole.VOLUNTEER_COMPANIES] },
+          },
+          select: { eventId: true },
+        },
+      },
+    });
+    if (
+      !user ||
+      !user.ativo ||
+      user.tipoPerfil !== UserType.VOLUNTEER ||
+      !user.senhaHash ||
+      user.eventMembers.length === 0
+    ) {
+      throw new UnauthorizedException('Credenciais invalidas');
+    }
+    const ok = await bcrypt.compare(input.senha, user.senhaHash);
+    if (!ok) throw new UnauthorizedException('Credenciais invalidas');
+    return this.issueTokens(user.id, 'VOLUNTEER', user.nome);
+  }
+
   private async issueTokens(
     userId: string,
-    tipoPerfil: 'ADMIN' | 'COMPANY' | 'STUDENT',
+    tipoPerfil: 'ADMIN' | 'COMPANY' | 'STUDENT' | 'VOLUNTEER',
     nome: string,
   ): Promise<LoginResponse> {
     const accessToken = await this.jwt.signAsync(
@@ -349,6 +382,44 @@ export class AuthService {
     } catch {
       // logout idempotente - nao falha se token ja e invalido
     }
+  }
+
+  /**
+   * Lista escopos de voluntario do user logado, agrupados por evento.
+   * Retorno: [{ eventId, eventNome, scopes: ['VOLUNTEER_STUDENTS', ...] }]
+   * Usado pelo dashboard `/voluntario` para listar eventos e acoes.
+   */
+  async listVolunteerScopes(userId: string): Promise<
+    Array<{ eventId: string; eventNome: string; scopes: ('VOLUNTEER_STUDENTS' | 'VOLUNTEER_COMPANIES')[] }>
+  > {
+    const members = await this.prisma.eventMember.findMany({
+      where: {
+        userId,
+        role: {
+          in: [EventMemberRole.VOLUNTEER_STUDENTS, EventMemberRole.VOLUNTEER_COMPANIES],
+        },
+      },
+      include: { event: { select: { id: true, nome: true, startsAt: true } } },
+      orderBy: { event: { startsAt: 'desc' } },
+    });
+    const byEvent = new Map<
+      string,
+      { eventId: string; eventNome: string; scopes: ('VOLUNTEER_STUDENTS' | 'VOLUNTEER_COMPANIES')[] }
+    >();
+    for (const m of members) {
+      const existing = byEvent.get(m.event.id);
+      const scope = m.role as 'VOLUNTEER_STUDENTS' | 'VOLUNTEER_COMPANIES';
+      if (existing) {
+        if (!existing.scopes.includes(scope)) existing.scopes.push(scope);
+      } else {
+        byEvent.set(m.event.id, {
+          eventId: m.event.id,
+          eventNome: m.event.nome,
+          scopes: [scope],
+        });
+      }
+    }
+    return Array.from(byEvent.values());
   }
 
   async validateAccessPayload(payload: JwtAccessPayload): Promise<AuthenticatedUser> {
