@@ -39,9 +39,9 @@ cd apps/web && pnpm dev   # http://localhost:3000
 | Perfil | Credenciais |
 |--------|-------------|
 | Admin | CPF `00000000000` · senha `admin1234` |
-| Estudante interno | matrícula `202600001` · CPF `33333333333` |
-| Empresa (TechCo) | cpfEmpresa `11111111111` · cpfResponsavel `11111111112` |
-| Empresa (Carreiras Hub) | cpfEmpresa `22222222222` · cpfResponsavel `22222222223` |
+| Estudante interno | matrícula `UC24101130` · CPF `33333333333` |
+| Empresa (TechCo) | CPF `11111111111` · senha `empresa1234` |
+| Empresa (Carreiras Hub) | CPF `22222222222` · senha `empresa1234` |
 
 Visitante externo se auto-cadastra em [/cadastro/visitante](http://localhost:3000/cadastro/visitante).
 

@@ -39,9 +39,15 @@ export const adminLoginSchema = z.object({
 });
 export type AdminLoginInput = z.infer<typeof adminLoginSchema>;
 
+/**
+ * Login do responsavel de empresa. CPF + senha pessoal (bcrypt), padrao
+ * moderno. Cada responsavel cadastrado por uma empresa tem sua propria
+ * senha — pode haver varios responsaveis para a mesma empresa, cada um
+ * acessa com seu CPF + sua senha.
+ */
 export const companyLoginSchema = z.object({
-  cpfEmpresa: cpfSchema,       // CPF vinculado a company
-  cpfResponsavel: cpfSchema,   // CPF do responsavel cadastrado pelo ADM
+  cpf: cpfSchema,
+  senha: z.string().min(8, 'Senha minima de 8 caracteres'),
 });
 export type CompanyLoginInput = z.infer<typeof companyLoginSchema>;
 

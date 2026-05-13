@@ -6,6 +6,7 @@ const prisma = new PrismaClient();
 
 const DEMO_ADMIN_CPF = '00000000000';
 const DEMO_ADMIN_SENHA = 'admin1234';
+const DEMO_COMPANY_SENHA = 'empresa1234';
 const DEMO_EVENT_SLUG = 'evento-demo-2026';
 
 async function main() {
@@ -106,15 +107,21 @@ async function main() {
         meta: { stand: e.slug.toUpperCase() },
       },
     });
+    const responsavelSenhaHash = await bcrypt.hash(DEMO_COMPANY_SENHA, 12);
     for (const resp of e.responsaveis) {
       const respUser = await prisma.user.upsert({
         where: { cpf: resp.cpf },
-        update: { tipoPerfil: UserType.COMPANY, email: resp.email },
+        update: {
+          tipoPerfil: UserType.COMPANY,
+          email: resp.email,
+          senhaHash: responsavelSenhaHash,
+        },
         create: {
           nome: resp.nome,
           cpf: resp.cpf,
           email: resp.email,
           tipoPerfil: UserType.COMPANY,
+          senhaHash: responsavelSenhaHash,
         },
       });
       await prisma.companyResponsible.upsert({
@@ -212,8 +219,9 @@ async function main() {
   console.log('--- Credenciais para teste ---');
   console.log(`  ADMIN:     CPF ${DEMO_ADMIN_CPF} / senha ${DEMO_ADMIN_SENHA}`);
   console.log('  ESTUDANTE: matricula UC24101130 / CPF 33333333333');
-  console.log('  EMPRESA:   cpfEmpresa 11111111111 + cpfResponsavel 11111111112 (TechCo)');
-  console.log('             cpfEmpresa 22222222222 + cpfResponsavel 22222222223 (Carreiras Hub)');
+  console.log(`  EMPRESA:   CPF 11111111111 / senha ${DEMO_COMPANY_SENHA} (TechCo - resp 1)`);
+  console.log(`             CPF 11111111112 / senha ${DEMO_COMPANY_SENHA} (TechCo - resp 2)`);
+  console.log(`             CPF 22222222222 / senha ${DEMO_COMPANY_SENHA} (Carreiras Hub - resp 1)`);
 }
 
 main()

@@ -5,8 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventMemberRole, Prisma, UserType } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import type { CompanyCreateInput, CompanyDto, CompanyUpdateInput } from '@eventpass/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
+
+const BCRYPT_ROUNDS = 12;
 
 function slugify(src: string): string {
   return src
@@ -48,6 +51,7 @@ export class CompaniesService {
       });
 
       for (const resp of input.responsaveis) {
+        const senhaHash = resp.senha ? await bcrypt.hash(resp.senha, BCRYPT_ROUNDS) : null;
         let user = await tx.user.findUnique({ where: { cpf: resp.cpf } });
         if (!user) {
           user = await tx.user.create({
@@ -56,13 +60,25 @@ export class CompaniesService {
               cpf: resp.cpf,
               email: resp.email,
               tipoPerfil: UserType.COMPANY,
+              senhaHash: senhaHash ?? undefined,
             },
           });
         } else if (user.tipoPerfil !== UserType.COMPANY) {
           // Promove para COMPANY. Mantem email/nome se user ja existia.
+          // Se admin enviou senha, sobrescreve.
           user = await tx.user.update({
             where: { id: user.id },
-            data: { tipoPerfil: UserType.COMPANY, email: user.email ?? resp.email },
+            data: {
+              tipoPerfil: UserType.COMPANY,
+              email: user.email ?? resp.email,
+              senhaHash: senhaHash ?? undefined,
+            },
+          });
+        } else if (senhaHash) {
+          // Ja era COMPANY e admin enviou senha — atualiza.
+          user = await tx.user.update({
+            where: { id: user.id },
+            data: { senhaHash },
           });
         }
         await tx.companyResponsible.upsert({
@@ -123,6 +139,7 @@ export class CompaniesService {
         });
         const keepIds = new Set<string>();
         for (const resp of input.responsaveis!) {
+          const senhaHash = resp.senha ? await bcrypt.hash(resp.senha, BCRYPT_ROUNDS) : null;
           let user = await tx.user.findUnique({ where: { cpf: resp.cpf } });
           if (!user) {
             user = await tx.user.create({
@@ -131,12 +148,21 @@ export class CompaniesService {
                 cpf: resp.cpf,
                 email: resp.email,
                 tipoPerfil: UserType.COMPANY,
+                senhaHash: senhaHash ?? undefined,
               },
             });
           } else if (user.tipoPerfil !== UserType.COMPANY) {
             user = await tx.user.update({
               where: { id: user.id },
-              data: { tipoPerfil: UserType.COMPANY },
+              data: {
+                tipoPerfil: UserType.COMPANY,
+                senhaHash: senhaHash ?? undefined,
+              },
+            });
+          } else if (senhaHash) {
+            user = await tx.user.update({
+              where: { id: user.id },
+              data: { senhaHash },
             });
           }
           keepIds.add(user.id);
@@ -175,6 +201,32 @@ export class CompaniesService {
     });
     if (!company) throw new NotFoundException('Empresa nao encontrada');
     await this.prisma.company.delete({ where: { id: companyId } });
+  }
+
+  /**
+   * Reset administrativo da senha de um responsavel. Verifica que o usuario
+   * realmente e responsavel da empresa indicada no evento informado antes
+   * de sobrescrever a senha — evita reset acidental de usuario errado.
+   * Nao retorna a senha (admin define a nova).
+   */
+  async resetResponsavelSenha(
+    eventId: string,
+    companyId: string,
+    userId: string,
+    novaSenha: string,
+  ): Promise<void> {
+    const link = await this.prisma.companyResponsible.findUnique({
+      where: { companyId_userId: { companyId, userId } },
+      include: { company: { select: { eventId: true } } },
+    });
+    if (!link || link.company.eventId !== eventId) {
+      throw new NotFoundException('Responsavel nao encontrado nesta empresa/evento');
+    }
+    const senhaHash = await bcrypt.hash(novaSenha, BCRYPT_ROUNDS);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { senhaHash },
+    });
   }
 
   async setLogoKey(

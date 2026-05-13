@@ -13,8 +13,10 @@ import { EventMemberRole, UserType } from '@prisma/client';
 import {
   companyCreateSchema,
   companyUpdateSchema,
+  responsavelSenhaResetSchema,
   type CompanyCreateInput,
   type CompanyUpdateInput,
+  type ResponsavelSenhaResetInput,
 } from '@eventpass/shared';
 import { z } from 'zod';
 
@@ -80,6 +82,29 @@ export class CompaniesController {
     @Param('companyId', new ParseUUIDPipe()) companyId: string,
   ) {
     await this.companies.remove(eventId, companyId);
+  }
+
+  /**
+   * Reset administrativo de senha de um responsavel de empresa. Usado pelo
+   * admin (e, na proxima rodada, pelo Voluntario Empresas) quando o
+   * responsavel esquece a senha ou precisa de senha inicial.
+   */
+  @Patch(':companyId/responsaveis/:userId/senha')
+  @Roles(UserType.ADMIN)
+  @HttpCode(204)
+  async resetResponsavelSenha(
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Param('companyId', new ParseUUIDPipe()) companyId: string,
+    @Param('userId', new ParseUUIDPipe()) userId: string,
+    @Body(new ZodValidationPipe(responsavelSenhaResetSchema))
+    dto: ResponsavelSenhaResetInput,
+  ) {
+    await this.companies.resetResponsavelSenha(
+      eventId,
+      companyId,
+      userId,
+      dto.novaSenha,
+    );
   }
 
   @Patch(':companyId/logo')

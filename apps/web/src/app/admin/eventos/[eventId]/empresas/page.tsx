@@ -14,9 +14,13 @@ import {
 } from '../../../../../components/form';
 
 interface Responsavel {
+  /** Id do User quando o responsavel ja existe (vindo de initial). */
+  id?: string;
   nome: string;
   cpf: string;
   email?: string;
+  /** Senha pessoal usada no login. Opcional ao editar — se vazia mantem a anterior. */
+  senha?: string;
 }
 
 export default function EventCompaniesPage() {
@@ -232,11 +236,12 @@ function CompanyForm({
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>(
     initial
       ? initial.responsaveis.map((r) => ({
+          id: r.id,
           nome: r.nome,
           cpf: r.cpf,
           email: r.email ?? undefined,
         }))
-      : [{ nome: '', cpf: '', email: '' }],
+      : [{ nome: '', cpf: '', email: '', senha: '' }],
   );
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -257,6 +262,9 @@ function CompanyForm({
           nome: r.nome,
           cpf: r.cpf,
           email: r.email || undefined,
+          // Backend so atualiza a senha quando o admin envia um valor;
+          // ao editar, deixar em branco preserva a senha anterior.
+          senha: r.senha && r.senha.length >= 8 ? r.senha : undefined,
         })),
       };
       if (initial) {
@@ -306,48 +314,63 @@ function CompanyForm({
       <div className="mt-4">
         <p className="text-sm font-semibold text-slate-800">Responsaveis</p>
         <p className="text-xs text-slate-500">
-          CPFs dos responsaveis sao usados para login. Adicione pelo menos 1.
+          Cada responsavel acessa com seu CPF + senha pessoal. Em novos
+          responsaveis a senha e obrigatoria; ao editar, deixe em branco
+          para preservar a senha atual.
         </p>
         <div className="mt-2 flex flex-col gap-2">
           {responsaveis.map((r, i) => (
             <div
-              key={i}
-              className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 p-3 md:grid-cols-[1fr_1fr_1fr_auto]"
+              key={r.id ?? `new-${i}`}
+              className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3"
             >
-              <TextInput
-                placeholder="Nome"
-                value={r.nome}
-                onChange={(e) => updateResp(i, { nome: e.target.value })}
-              />
-              <TextInput
-                placeholder="CPF (so numeros)"
-                value={r.cpf}
-                onChange={(e) => updateResp(i, { cpf: e.target.value })}
-              />
-              <TextInput
-                placeholder="Email (opcional)"
-                type="email"
-                value={r.email ?? ''}
-                onChange={(e) => updateResp(i, { email: e.target.value })}
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  setResponsaveis((arr) =>
-                    arr.length === 1 ? arr : arr.filter((_, idx) => idx !== i),
-                  )
-                }
-                className="text-xs text-red-600"
-              >
-                Remover
-              </button>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto]">
+                <TextInput
+                  placeholder="Nome"
+                  value={r.nome}
+                  onChange={(e) => updateResp(i, { nome: e.target.value })}
+                />
+                <TextInput
+                  placeholder="CPF (so numeros)"
+                  value={r.cpf}
+                  onChange={(e) => updateResp(i, { cpf: e.target.value })}
+                  inputMode="numeric"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setResponsaveis((arr) =>
+                      arr.length === 1 ? arr : arr.filter((_, idx) => idx !== i),
+                    )
+                  }
+                  className="self-stretch text-xs text-red-600 md:self-center"
+                >
+                  Remover
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                <TextInput
+                  placeholder="Email (opcional)"
+                  type="email"
+                  value={r.email ?? ''}
+                  onChange={(e) => updateResp(i, { email: e.target.value })}
+                />
+                <TextInput
+                  placeholder={r.id ? 'Nova senha (deixe vazio para manter)' : 'Senha (min 8 caracteres)'}
+                  type="password"
+                  value={r.senha ?? ''}
+                  onChange={(e) => updateResp(i, { senha: e.target.value })}
+                  minLength={8}
+                  autoComplete="new-password"
+                />
+              </div>
             </div>
           ))}
         </div>
         <button
           type="button"
           onClick={() =>
-            setResponsaveis((arr) => [...arr, { nome: '', cpf: '', email: '' }])
+            setResponsaveis((arr) => [...arr, { nome: '', cpf: '', email: '', senha: '' }])
           }
           className="mt-2 text-sm font-medium text-brand-primary"
         >

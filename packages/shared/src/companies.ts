@@ -17,6 +17,12 @@ export const companyCreateSchema = z.object({
         nome: z.string().min(2).max(120),
         cpf: cpfOnlyDigitsSchema,
         email: z.string().email().optional(),
+        /**
+         * Senha inicial do responsavel (bcrypt no backend). Quando omitida
+         * no cadastro pelo admin, o responsavel precisa redefinir antes do
+         * primeiro login — fluxo "senha pendente".
+         */
+        senha: z.string().min(8, 'Senha minima de 8 caracteres').max(72).optional(),
       }),
     )
     .min(1, 'Cadastre pelo menos 1 responsavel'),
@@ -27,6 +33,16 @@ export const companyUpdateSchema = companyCreateSchema
   .partial()
   .extend({ ativo: z.boolean().optional() });
 export type CompanyUpdateInput = z.infer<typeof companyUpdateSchema>;
+
+/**
+ * Reset administrativo da senha de um responsavel. O admin (ou Voluntario
+ * Empresas, na proxima rodada) atribui uma nova senha que sobrescreve a
+ * anterior. Sem confirmacao porque e admin agindo em nome do responsavel.
+ */
+export const responsavelSenhaResetSchema = z.object({
+  novaSenha: z.string().min(8, 'Senha minima de 8 caracteres').max(72),
+});
+export type ResponsavelSenhaResetInput = z.infer<typeof responsavelSenhaResetSchema>;
 
 export const companyDtoSchema = z.object({
   id: z.string().uuid(),

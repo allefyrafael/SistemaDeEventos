@@ -65,41 +65,32 @@ export class AuthService {
   }
 
   /**
-   * Empresa: dois CPFs, ambos devem estar cadastrados como
-   * CompanyResponsible da MESMA empresa. Serve como "senha compartilhada"
-   * entre os responsaveis daquele stand (interpretacao da spec).
+   * Empresa: responsavel faz login com seu proprio CPF + senha pessoal
+   * (bcrypt). Substituiu o fluxo legado de "2 CPFs distintos".
+   *
+   * Pre-requisito: o responsavel precisa ter sido cadastrado pelo admin
+   * (ou pelo Voluntario Empresas) com uma senha definida — senao recebe
+   * "credenciais invalidas" generico. Reset de senha e administrativo:
+   * PATCH /events/:eventId/companies/:companyId/responsaveis/:userId/senha.
    */
   async loginCompany(input: CompanyLoginInput): Promise<LoginResponse> {
-    if (input.cpfEmpresa === input.cpfResponsavel) {
-      throw new UnauthorizedException('CPFs devem ser diferentes');
-    }
-
-    const [cpfEmpresaUser, cpfRespUser] = await Promise.all([
-      this.prisma.user.findUnique({
-        where: { cpf: input.cpfEmpresa },
-        include: { companyResponsible: { select: { companyId: true } } },
-      }),
-      this.prisma.user.findUnique({
-        where: { cpf: input.cpfResponsavel },
-        include: { companyResponsible: { select: { companyId: true } } },
-      }),
-    ]);
-
-    if (!cpfEmpresaUser || !cpfRespUser || !cpfEmpresaUser.ativo || !cpfRespUser.ativo) {
+    const user = await this.prisma.user.findUnique({
+      where: { cpf: input.cpf },
+      include: { companyResponsible: { select: { companyId: true } } },
+    });
+    if (
+      !user ||
+      !user.ativo ||
+      user.tipoPerfil !== UserType.COMPANY ||
+      !user.senhaHash ||
+      user.companyResponsible.length === 0
+    ) {
+      // Mensagem generica para nao vazar quais CPFs existem.
       throw new UnauthorizedException('Credenciais invalidas');
     }
-
-    const companiesA = new Set(cpfEmpresaUser.companyResponsible.map((c) => c.companyId));
-    const sharedCompany = cpfRespUser.companyResponsible.find((c) => companiesA.has(c.companyId));
-    if (!sharedCompany) {
-      throw new UnauthorizedException('Credenciais invalidas');
-    }
-
-    // Quem LOGA e o cpfResponsavel (quem abriu o app)
-    if (cpfRespUser.tipoPerfil !== 'COMPANY') {
-      throw new ForbiddenException('Perfil nao autorizado');
-    }
-    return this.issueTokens(cpfRespUser.id, 'COMPANY', cpfRespUser.nome);
+    const ok = await bcrypt.compare(input.senha, user.senhaHash);
+    if (!ok) throw new UnauthorizedException('Credenciais invalidas');
+    return this.issueTokens(user.id, 'COMPANY', user.nome);
   }
 
   /**

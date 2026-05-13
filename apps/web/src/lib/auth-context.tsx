@@ -16,7 +16,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   loginAdmin: (cpf: string, senha: string) => Promise<AuthUser>;
-  loginCompany: (cpfEmpresa: string, cpfResponsavel: string) => Promise<AuthUser>;
+  loginCompany: (cpf: string, senha: string) => Promise<AuthUser>;
   loginStudent: (matricula: string, cpf: string) => Promise<AuthUser>;
   loginVisitor: (cpf: string, senha: string) => Promise<AuthUser>;
   registerVisitor: (input: {
@@ -68,8 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [doLogin],
   );
   const loginCompany = useCallback(
-    (cpfEmpresa: string, cpfResponsavel: string) =>
-      doLogin('/auth/login/empresa', { cpfEmpresa, cpfResponsavel }),
+    (cpf: string, senha: string) => doLogin('/auth/login/empresa', { cpf, senha }),
     [doLogin],
   );
   const loginStudent = useCallback(
