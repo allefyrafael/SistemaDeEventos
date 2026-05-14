@@ -9,6 +9,7 @@ import * as bcrypt from 'bcrypt';
 import type { VolunteerCreateInput, VolunteerDto, VolunteerScope } from '@eventpass/shared';
 
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { perfilLabel } from '../auth/perfil-label';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -68,8 +69,11 @@ export class VolunteersService {
       where: { cpf: input.cpf },
     });
     if (existingByCpf && existingByCpf.tipoPerfil !== UserType.VOLUNTEER) {
+      // Cada CPF so pode ter UM perfil (User.cpf e @unique). Mensagem
+      // diz exatamente qual perfil esta ocupando o CPF.
       throw new ConflictException(
-        'CPF ja cadastrado com outro perfil. Use outro CPF para cadastrar como voluntario.',
+        `Este CPF ja esta cadastrado como ${perfilLabel(existingByCpf.tipoPerfil)}. ` +
+          'Cada CPF so pode ter um perfil — use um CPF diferente para o voluntario.',
       );
     }
 

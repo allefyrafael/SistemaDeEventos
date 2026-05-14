@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { RedisService } from '../../core/redis/redis.service';
+import { perfilLabel } from './perfil-label';
 import type { Env } from '../../core/config/env.schema';
 import type {
   AdminLoginInput,
@@ -143,7 +144,9 @@ export class AuthService {
 
     if (existing) {
       if (existing.tipoPerfil !== UserType.STUDENT) {
-        throw new ConflictException('CPF ja cadastrado com outro perfil');
+        throw new ConflictException(
+          `Este CPF ja esta cadastrado como ${perfilLabel(existing.tipoPerfil)}.`,
+        );
       }
       if (existing.studentKind !== StudentKind.EXTERNAL) {
         // Evita que estudante INTERNAL (com matricula) sobrescreva o cadastro
@@ -232,7 +235,9 @@ export class AuthService {
 
     if (existing) {
       if (existing.tipoPerfil !== UserType.STUDENT) {
-        throw new ConflictException('CPF ja cadastrado com outro perfil');
+        throw new ConflictException(
+          `Este CPF ja esta cadastrado como ${perfilLabel(existing.tipoPerfil)}.`,
+        );
       }
       if (existing.studentKind === StudentKind.EXTERNAL) {
         throw new ConflictException(
