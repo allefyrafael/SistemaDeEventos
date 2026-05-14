@@ -7,7 +7,6 @@ import type { FeatureModule } from '@eventpass/shared';
 import {
   BookMarked,
   Map as MapIcon,
-  MessageSquare,
   QrCode,
   User as UserIcon,
 } from 'lucide-react';
@@ -19,11 +18,14 @@ type Tab = { href: Route; label: string; icon: ReactNode; module?: FeatureModule
 
 const ICON_SIZE = 18;
 
+// Aba "Feedback" removida: a avaliacao acontece INLINE no item do
+// passaporte (modal sobre o card carimbado). Reduz cliques, mantem o
+// contexto e evita uma tela inteira so para um formulario curto.
+// A rota /estudante/feedback continua existindo para deep links eventuais.
 const ALL_STUDENT_TABS: Tab[] = [
   { href: '/estudante' as Route, label: 'QR', icon: <QrCode size={ICON_SIZE} />, module: 'qr_scan' },
   { href: '/estudante/mapa' as Route, label: 'Mapa', icon: <MapIcon size={ICON_SIZE} />, module: 'venue_map' },
   { href: '/estudante/passaporte' as Route, label: 'Passaporte', icon: <BookMarked size={ICON_SIZE} />, module: 'passport' },
-  { href: '/estudante/feedback' as Route, label: 'Feedback', icon: <MessageSquare size={ICON_SIZE} />, module: 'feedback' },
   { href: '/estudante/perfil' as Route, label: 'Perfil', icon: <UserIcon size={ICON_SIZE} />, module: 'student_profile' },
 ];
 

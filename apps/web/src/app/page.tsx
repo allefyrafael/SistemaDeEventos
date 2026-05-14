@@ -147,9 +147,9 @@ export default function HomePage() {
                 <GraduationCap size={24} strokeWidth={2} />
               </span>
               <span className="min-w-0">
-                <span className="block text-lg font-bold leading-tight">Sou estudante</span>
+                <span className="block text-lg font-bold leading-tight">Sou participante</span>
                 <span className="mt-0.5 block text-xs text-white/80 sm:text-sm">
-                  Acesso com matricula + CPF
+                  Estudantes UCB e visitantes externos
                 </span>
               </span>
             </span>
