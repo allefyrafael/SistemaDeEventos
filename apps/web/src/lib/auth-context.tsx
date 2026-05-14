@@ -32,7 +32,6 @@ interface AuthContextValue {
     nome: string;
     cpf: string;
     email: string;
-    senha: string;
     eventId: string;
   }) => Promise<AuthUser>;
   logout: () => Promise<void>;
@@ -103,7 +102,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       nome: string;
       cpf: string;
       email: string;
-      senha: string;
       eventId: string;
     }) => {
       const resp = await api<AuthTokens>('/auth/register/estudante', {

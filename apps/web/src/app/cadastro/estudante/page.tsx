@@ -4,13 +4,32 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { PublicEvent } from '@eventpass/shared';
-import { useAuth } from '../../../lib/auth-context';
 import { api, ApiError } from '../../../lib/api';
-import { Field, TextInput, Button, ErrorBanner } from '../../../components/form';
+import { useAuth } from '../../../lib/auth-context';
+import { maskCpf, stripCpf } from '../../../lib/cpf-mask';
+import {
+  AuthShell,
+  AuthKicker,
+  AuthHero,
+} from '../../../components/auth/auth-shell';
+import { AuthField } from '../../../components/auth/field';
+import { AuthSelect } from '../../../components/auth/select';
+import { AuthCta } from '../../../components/auth/cta-button';
+import { AuthErrorBanner } from '../../../components/auth/error-banner';
 
 export default function StudentRegisterPageWrapper() {
   return (
-    <Suspense fallback={<main className="p-6 text-sm text-slate-500">Carregando...</main>}>
+    <Suspense
+      fallback={
+        <main
+          className="min-h-dvh"
+          style={{
+            background:
+              'linear-gradient(180deg, #F7F1E1 0%, #F1ECDD 28%, #E4E7EE 70%, #C9D3E3 100%)',
+          }}
+        />
+      }
+    >
       <StudentRegisterPage />
     </Suspense>
   );
@@ -18,6 +37,12 @@ export default function StudentRegisterPageWrapper() {
 
 const MATRICULA_PATTERN = /^UC\d{8}$/;
 
+/**
+ * Cadastro de estudante UCB. Login posterior por matricula + CPF (sem
+ * senha) — por isso esse form NAO pede senha. Visual Editorial casado
+ * com a home e os logins (font-display italic, accent #1E46B0, fields
+ * com ring 4px).
+ */
 function StudentRegisterPage() {
   const { registerStudent } = useAuth();
   const router = useRouter();
@@ -30,7 +55,6 @@ function StudentRegisterPage() {
   const [nome, setNome] = useState('');
   const [cpf, setCpf] = useState('');
   const [email, setEmail] = useState('');
-  const [senha, setSenha] = useState('');
   const [eventId, setEventId] = useState<string>('');
 
   const [submitErr, setSubmitErr] = useState<string | null>(null);
@@ -58,173 +82,151 @@ function StudentRegisterPage() {
     [events, eventId],
   );
 
-  const matriculaInvalida =
-    matricula.length > 0 && !MATRICULA_PATTERN.test(matricula.toUpperCase());
+  const cpfDigits = stripCpf(cpf);
+  const matriculaInvalid =
+    matricula.length > 0 && !MATRICULA_PATTERN.test(matricula);
+  const formValid =
+    !!eventId &&
+    MATRICULA_PATTERN.test(matricula) &&
+    nome.trim().length >= 3 &&
+    cpfDigits.length === 11 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitErr(null);
-    if (!eventId) {
-      setSubmitErr('Selecione um evento');
-      return;
-    }
-    const matriculaUpper = matricula.toUpperCase().trim();
-    if (!MATRICULA_PATTERN.test(matriculaUpper)) {
-      setSubmitErr('Matricula deve seguir o padrao UC seguido de 8 digitos (ex: UC24101130)');
-      return;
-    }
+    if (!formValid) return;
     setSubmitting(true);
     try {
       await registerStudent({
-        matricula: matriculaUpper,
+        matricula,
         nome,
-        cpf,
+        cpf: cpfDigits,
         email,
-        senha,
         eventId,
       });
       router.replace('/estudante');
     } catch (error) {
-      const e = error as ApiError;
-      setSubmitErr(e.message ?? 'Falha no cadastro');
+      const err = error as ApiError;
+      setSubmitErr(err.message ?? 'Falha no cadastro');
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 p-6 pb-12">
-      <div>
-        <button
-          type="button"
-          onClick={() => {
-            if (typeof window !== 'undefined' && window.history.length > 1) {
-              router.back();
-            } else {
-              router.replace('/cadastro');
-            }
-          }}
-          className="text-sm text-slate-500 hover:text-brand-primary"
-        >
-          &larr; Voltar
-        </button>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900">Cadastro de estudante</h1>
-        <p className="text-sm text-slate-600">
-          Use sua matricula institucional (padrao UC seguido de 8 digitos).
-        </p>
+    <AuthShell backHref="/cadastro">
+      <div className="mt-1">
+        <AuthKicker>Novo por aqui</AuthKicker>
+        <AuthHero
+          lineA="Criar conta"
+          lineB="de estudante."
+          size="md"
+          description="Use sua matricula institucional (padrao UC + 8 digitos). O login depois sera pela mesma matricula + seu CPF — sem senha."
+        />
       </div>
 
-      {loadEventsErr && <ErrorBanner>{loadEventsErr}</ErrorBanner>}
+      {loadEventsErr && (
+        <div className="mt-4">
+          <AuthErrorBanner>{loadEventsErr}</AuthErrorBanner>
+        </div>
+      )}
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Field label="Evento">
-          {events === null ? (
-            <p className="text-sm text-slate-500">Carregando eventos...</p>
-          ) : events.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              Nenhum evento aberto para inscricao no momento.
-            </p>
-          ) : (
-            <select
-              value={eventId}
-              onChange={(e) => setEventId(e.target.value)}
-              required
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base outline-none transition focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
-            >
-              <option value="" disabled>
-                Selecione um evento
-              </option>
-              {events.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.nome}
-                </option>
-              ))}
-            </select>
-          )}
-          {selectedEvent?.descricao && (
-            <span className="mt-1 text-xs text-slate-500">{selectedEvent.descricao}</span>
-          )}
-        </Field>
+      <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-4">
+        <AuthSelect
+          label="Evento"
+          value={eventId}
+          onChange={setEventId}
+          hint={selectedEvent?.descricao ?? undefined}
+          required
+          disabled={!events || events.length === 0}
+        >
+          <option value="">
+            {events === null
+              ? 'Carregando eventos...'
+              : events.length === 0
+                ? 'Nenhum evento aberto'
+                : 'Selecione um evento'}
+          </option>
+          {events?.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.nome}
+            </option>
+          ))}
+        </AuthSelect>
 
-        <Field
+        <AuthField
           label="Matricula"
           hint="Padrao UC + 8 digitos (ex: UC24101130)"
-          error={matriculaInvalida ? 'Formato invalido. Use UC seguido de 8 digitos.' : undefined}
-        >
-          <TextInput
-            type="text"
-            value={matricula}
-            onChange={(e) => setMatricula(e.target.value.toUpperCase())}
-            placeholder="UC24101130"
-            maxLength={10}
-            required
-            invalid={matriculaInvalida}
-            autoCapitalize="characters"
-          />
-        </Field>
+          error={
+            matriculaInvalid
+              ? 'Formato invalido. Use UC seguido de 8 digitos.'
+              : undefined
+          }
+          value={matricula}
+          onChange={(v) =>
+            setMatricula(v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))
+          }
+          placeholder="UC24101130"
+          mono
+          maxLength={10}
+          autoComplete="username"
+          autoCapitalize="characters"
+          required
+        />
 
-        <Field label="Nome completo">
-          <TextInput
-            type="text"
-            placeholder="Seu nome"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            required
-            minLength={3}
-            maxLength={120}
-          />
-        </Field>
+        <AuthField
+          label="Nome completo"
+          value={nome}
+          onChange={setNome}
+          placeholder="Seu nome"
+          minLength={3}
+          maxLength={120}
+          autoComplete="name"
+          required
+        />
 
-        <Field label="CPF">
-          <TextInput
-            type="text"
-            inputMode="numeric"
-            placeholder="000.000.000-00"
-            value={cpf}
-            onChange={(e) => setCpf(e.target.value)}
-            required
-          />
-        </Field>
+        <AuthField
+          label="CPF"
+          value={cpf}
+          onChange={(v) => setCpf(maskCpf(v))}
+          placeholder="000.000.000-00"
+          mono
+          inputMode="numeric"
+          maxLength={14}
+          required
+        />
 
-        <Field label="Email institucional">
-          <TextInput
-            type="email"
-            placeholder="voce@ucb.br"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            maxLength={120}
-          />
-        </Field>
+        <AuthField
+          label="Email institucional"
+          value={email}
+          onChange={setEmail}
+          placeholder="voce@ucb.br"
+          type="email"
+          inputMode="email"
+          maxLength={120}
+          autoComplete="email"
+          required
+        />
 
-        <Field label="Senha" hint="Minimo de 8 caracteres. Sera usada nos proximos logins.">
-          <TextInput
-            type="password"
-            placeholder="Crie uma senha"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            required
-            minLength={8}
-            maxLength={72}
-          />
-        </Field>
+        <AuthErrorBanner>{submitErr}</AuthErrorBanner>
 
-        <ErrorBanner>{submitErr}</ErrorBanner>
-
-        <Button
-          type="submit"
-          disabled={submitting || !events || events.length === 0 || matriculaInvalida}
-        >
+        <AuthCta type="submit" disabled={!formValid} loading={submitting}>
           {submitting ? 'Cadastrando...' : 'Criar conta e entrar'}
-        </Button>
-
-        <p className="text-center text-xs text-slate-500">
-          Ja tem cadastro?{' '}
-          <Link href="/login/estudante" className="font-semibold text-brand-primary">
-            Faca login
-          </Link>
-        </p>
+        </AuthCta>
       </form>
-    </main>
+
+      <div className="flex-1" />
+
+      <p className="border-t border-black/10 pt-4 text-center text-[12.5px] text-[#6B7693]">
+        Ja tem cadastro?{' '}
+        <Link
+          href="/login/estudante"
+          className="font-semibold text-[#1E46B0] hover:underline"
+        >
+          Faca login
+        </Link>
+      </p>
+    </AuthShell>
   );
 }

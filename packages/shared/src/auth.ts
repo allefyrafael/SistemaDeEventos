@@ -77,16 +77,17 @@ export type VisitorLoginInput = z.infer<typeof visitorLoginSchema>;
 
 /**
  * Auto-cadastro de ESTUDANTE INTERNO (institucional). Exige a matricula
- * no padrao UC######## e cria o User como STUDENT/INTERNAL com bcrypt.
- * Sem checagem externa contra base da instituicao (assume confianca);
- * o admin pode auditar a lista posteriormente.
+ * no padrao UC######## e cria o User como STUDENT/INTERNAL — SEM senha.
+ * O login do estudante e por matricula + CPF (loginStudent), entao a
+ * senha nao e necessaria. Sem checagem externa contra base da
+ * instituicao (assume confianca); o admin pode auditar a lista
+ * posteriormente.
  */
 export const studentRegisterSchema = z.object({
   matricula: matriculaUcbSchema,
   nome: z.string().trim().min(3, 'Nome muito curto').max(120),
   cpf: cpfSchema,
   email: z.string().email('Email invalido').max(120),
-  senha: z.string().min(8, 'Senha minima de 8 caracteres').max(72),
   eventId: z.string().uuid('Evento invalido'),
 });
 export type StudentRegisterInput = z.infer<typeof studentRegisterSchema>;

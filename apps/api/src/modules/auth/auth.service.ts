@@ -177,12 +177,13 @@ export class AuthService {
 
   /**
    * Auto-cadastro de ESTUDANTE INTERNO (institucional). Matricula no padrao
-   * UC########, cria User STUDENT/INTERNAL com bcrypt e associa ao evento.
-   * Idempotente: re-registro do mesmo CPF (ja interno) atualiza dados.
+   * UC########, cria User STUDENT/INTERNAL sem senha (o login dele e por
+   * matricula + CPF, nao precisa de senha). Idempotente: re-registro do
+   * mesmo CPF (ja interno) atualiza nome/email/matricula e PRESERVA o
+   * senhaHash existente caso o user ja tivesse setado (compat).
    *
-   * NAO valida a matricula contra base externa — assume confianca + auditoria
-   * posterior pelo admin. Se admin importou via CSV (legado, sem senha), o
-   * re-registro com este endpoint adiciona a senha sem perder progresso.
+   * NAO valida a matricula contra base externa — assume confianca +
+   * auditoria posterior pelo admin.
    */
   async registerStudent(input: StudentRegisterInput): Promise<LoginResponse> {
     const event = await this.prisma.event.findUnique({ where: { id: input.eventId } });
@@ -202,7 +203,6 @@ export class AuthService {
     }
 
     const existing = await this.prisma.user.findUnique({ where: { cpf: input.cpf } });
-    const senhaHash = await this.hashPassword(input.senha);
 
     let userId: string;
     let userNome: string;
@@ -216,15 +216,14 @@ export class AuthService {
           'CPF ja cadastrado como visitante externo. Faca login pela rota de visitante.',
         );
       }
-      // INTERNAL existente (legado importado por CSV ou re-registro): atualiza
-      // dados e ADICIONA/atualiza senha.
+      // INTERNAL existente (legado importado por CSV ou re-registro):
+      // atualiza dados, PRESERVA senhaHash (nao tocamos).
       const updated = await this.prisma.user.update({
         where: { id: existing.id },
         data: {
           nome: input.nome,
           email: input.email,
           matricula: input.matricula,
-          senhaHash,
         },
       });
       userId = updated.id;
@@ -236,7 +235,7 @@ export class AuthService {
           cpf: input.cpf,
           email: input.email,
           matricula: input.matricula,
-          senhaHash,
+          // senhaHash: null por default — login do estudante e matricula+CPF.
           tipoPerfil: UserType.STUDENT,
           studentKind: StudentKind.INTERNAL,
         },
