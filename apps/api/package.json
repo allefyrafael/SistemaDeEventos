@@ -5,7 +5,9 @@
   "description": "API NestJS da plataforma EventPass.",
   "main": "dist/main.js",
   "scripts": {
+    "prebuild": "pnpm --filter @eventpass/shared build",
     "build": "nest build",
+    "predev": "pnpm --filter @eventpass/shared build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
