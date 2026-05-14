@@ -50,29 +50,46 @@ export class VolunteersService {
   }
 
   /**
-   * Cadastra voluntario no evento. Idempotente em CPFs existentes — promove
-   * para VOLUNTEER e (re)atribui a senha. Bloqueia colisao com outros perfis
-   * para nao quebrar logins ja em uso.
+   * Cadastra voluntario no evento. Idempotente no CPF — se o CPF ja
+   * existe como VOLUNTEER, atualiza dados e re-vincula ao evento.
+   *
+   * Valida ANTES de escrever (em vez de deixar a unique constraint do
+   * Prisma estourar 500):
+   * - CPF ja usado por outro perfil => 409 claro.
+   * - Email ja usado por OUTRO usuario (CPF diferente) => 409 claro.
+   *   O User.email e @unique global; reaproveitar email de aluno/empresa
+   *   quebraria a constraint.
    */
   async createInEvent(
     eventId: string,
     input: VolunteerCreateInput,
   ): Promise<VolunteerDto> {
-    const existingByMatricula = input.cpf
-      ? await this.prisma.user.findUnique({ where: { cpf: input.cpf } })
-      : null;
-    if (existingByMatricula && existingByMatricula.tipoPerfil !== UserType.VOLUNTEER) {
+    const existingByCpf = await this.prisma.user.findUnique({
+      where: { cpf: input.cpf },
+    });
+    if (existingByCpf && existingByCpf.tipoPerfil !== UserType.VOLUNTEER) {
       throw new ConflictException(
         'CPF ja cadastrado com outro perfil. Use outro CPF para cadastrar como voluntario.',
+      );
+    }
+
+    // Email e unico globalmente. Checa colisao com QUALQUER outro user
+    // (exceto o proprio, no caso de re-cadastro do mesmo voluntario).
+    const existingByEmail = await this.prisma.user.findUnique({
+      where: { email: input.email },
+    });
+    if (existingByEmail && existingByEmail.id !== existingByCpf?.id) {
+      throw new ConflictException(
+        'Email ja cadastrado para outro usuario. Use um email diferente.',
       );
     }
 
     const senhaHash = await bcrypt.hash(input.senha, BCRYPT_ROUNDS);
 
     return this.prisma.$transaction(async (tx) => {
-      const user = existingByMatricula
+      const user = existingByCpf
         ? await tx.user.update({
-            where: { id: existingByMatricula.id },
+            where: { id: existingByCpf.id },
             data: {
               nome: input.nome,
               email: input.email,

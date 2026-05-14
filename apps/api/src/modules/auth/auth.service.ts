@@ -124,6 +124,18 @@ export class AuthService {
     }
 
     const existing = await this.prisma.user.findUnique({ where: { cpf: input.cpf } });
+
+    // Email e @unique global — checa colisao com OUTRO usuario antes de
+    // gravar (evita 500 cru da unique constraint do Prisma).
+    const existingByEmail = await this.prisma.user.findUnique({
+      where: { email: input.email },
+    });
+    if (existingByEmail && existingByEmail.id !== existing?.id) {
+      throw new ConflictException(
+        'Email ja cadastrado para outro usuario. Use um email diferente.',
+      );
+    }
+
     const senhaHash = await this.hashPassword(input.senha);
 
     let userId: string;
@@ -203,6 +215,17 @@ export class AuthService {
     }
 
     const existing = await this.prisma.user.findUnique({ where: { cpf: input.cpf } });
+
+    // Email e @unique global — checa colisao com OUTRO usuario antes de
+    // gravar (evita 500 cru da unique constraint do Prisma).
+    const existingByEmail = await this.prisma.user.findUnique({
+      where: { email: input.email },
+    });
+    if (existingByEmail && existingByEmail.id !== existing?.id) {
+      throw new ConflictException(
+        'Email ja cadastrado para outro usuario. Use um email diferente.',
+      );
+    }
 
     let userId: string;
     let userNome: string;
