@@ -10,6 +10,9 @@ out/
 .turbo/
 *.tsbuildinfo
 
+# Sandbox temporario de extracoes/experimentos do Claude
+.claude-tmp/
+
 # Env
 .env
 .env.local
