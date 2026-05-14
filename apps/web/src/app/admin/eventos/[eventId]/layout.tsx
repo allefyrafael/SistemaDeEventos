@@ -14,6 +14,7 @@ import {
   ScanLine,
   Settings,
   Stamp as StampIcon,
+  Tag,
   Users as UsersIcon,
   type LucideIcon,
 } from 'lucide-react';
@@ -67,6 +68,13 @@ const TABS: TabDef[] = [
     icon: Building2,
     requires: 'companies',
     description: 'Cadastro de empresas expositoras e responsaveis.',
+  },
+  {
+    segment: 'categorias',
+    label: 'Categorias',
+    icon: Tag,
+    requires: 'companies',
+    description: 'Categorias de empresa (agrupamento + atalho de autorizacao em stamps).',
   },
   {
     segment: 'alunos',

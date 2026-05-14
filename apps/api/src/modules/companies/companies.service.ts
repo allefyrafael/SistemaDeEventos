@@ -38,11 +38,20 @@ export class CompaniesService {
     if (clash) throw new ConflictException('Slug ja existe neste evento');
 
     return this.prisma.$transaction(async (tx) => {
+      // Valida categoria (se enviada) pertence ao evento.
+      if (input.categoryId) {
+        const cat = await tx.companyCategory.findFirst({
+          where: { id: input.categoryId, eventId },
+          select: { id: true },
+        });
+        if (!cat) throw new NotFoundException('Categoria nao pertence a este evento');
+      }
       const company = await tx.company.create({
         data: {
           eventId,
           nome: input.nome,
           slug,
+          categoryId: input.categoryId ?? null,
           meta: {
             descricao: input.descricao ?? null,
             stand: input.stand ?? null,
@@ -120,12 +129,24 @@ export class CompaniesService {
       stand: input.stand === undefined ? metaAtual.stand : input.stand,
     };
 
+    // Valida categoria (se sendo alterada) pertence ao evento.
+    if (input.categoryId) {
+      const cat = await this.prisma.companyCategory.findFirst({
+        where: { id: input.categoryId, eventId },
+        select: { id: true },
+      });
+      if (!cat) throw new NotFoundException('Categoria nao pertence a este evento');
+    }
+
     await this.prisma.company.update({
       where: { id: companyId },
       data: {
         nome: input.nome ?? undefined,
         slug: input.slug ?? undefined,
         ativo: input.ativo ?? undefined,
+        // Permite explicitamente desvincular passando null.
+        categoryId:
+          input.categoryId === undefined ? undefined : (input.categoryId ?? null),
         meta: meta as Prisma.InputJsonValue,
       },
     });
@@ -251,6 +272,7 @@ export class CompaniesService {
       orderBy: { nome: 'asc' },
       include: {
         responsibles: { include: { user: true } },
+        category: { select: { id: true, nome: true, color: true } },
         _count: { select: { stampsGranted: true } },
       },
     });
@@ -270,6 +292,7 @@ export class CompaniesService {
       where: { id: companyId, ...(eventId ? { eventId } : {}) },
       include: {
         responsibles: { include: { user: true } },
+        category: { select: { id: true, nome: true, color: true } },
         _count: { select: { stampsGranted: true } },
       },
     });
@@ -281,6 +304,7 @@ export class CompaniesService {
     c: Prisma.CompanyGetPayload<{
       include: {
         responsibles: { include: { user: true } };
+        category: { select: { id: true; nome: true; color: true } };
         _count: { select: { stampsGranted: true } };
       };
     }>,
@@ -295,6 +319,9 @@ export class CompaniesService {
       stand: (meta.stand as string | null) ?? null,
       descricao: (meta.descricao as string | null) ?? null,
       ativo: c.ativo,
+      category: c.category
+        ? { id: c.category.id, nome: c.category.nome, color: c.category.color }
+        : null,
       responsaveis: c.responsibles.map((r) => ({
         id: r.user.id,
         nome: r.user.nome,

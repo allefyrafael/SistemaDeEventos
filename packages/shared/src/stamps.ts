@@ -9,6 +9,15 @@ export const stampConfigCreateSchema = z.object({
   // Vazio (ou omitido) = qualquer empresa do evento pode carimbar.
   // Quando ha 1+ ids, somente essas empresas podem (helps explorar areas).
   authorizedCompanyIds: z.array(z.string().uuid()).optional(),
+  /**
+   * Atalho: libera TODAS as empresas de uma categoria como autorizadas.
+   * Coexiste com `authorizedCompanyIds` — a logica final e:
+   *   - se ha categoria E ha lista de empresas, ambas autorizam (uniao).
+   *   - se so categoria, empresas da categoria autorizadas.
+   *   - se so lista, somente essa lista.
+   *   - se nem categoria nem lista, qualquer empresa do evento pode.
+   */
+  companyCategoryId: z.string().uuid().nullable().optional(),
   // LEGADO (1:1) — aceita por retrocompat. Quando enviado e
   // authorizedCompanyIds esta omitido, e tratado como [valor].
   entidadeAutorizadaId: z.string().uuid().nullable().optional(),
@@ -29,6 +38,13 @@ export const stampConfigDtoSchema = z.object({
   authorizedCompanies: z.array(
     z.object({ id: z.string().uuid(), nome: z.string() }),
   ),
+  /**
+   * Categoria autorizada (atalho que libera todas as empresas dela).
+   * Coexiste com authorizedCompanies — soma de autorizacoes.
+   */
+  authorizedCategory: z
+    .object({ id: z.string().uuid(), nome: z.string(), color: z.string().nullable() })
+    .nullable(),
   // LEGADO: primeira empresa autorizada (compat com codigo antigo). Sera
   // removido em uma versao futura.
   entidadeAutorizada: z

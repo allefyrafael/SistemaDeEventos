@@ -10,3 +10,4 @@ export * from './dashboard';
 export * from './scan';
 export * from './venue-map';
 export * from './certificate';
+export * from './company-category';

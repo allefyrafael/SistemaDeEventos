@@ -11,6 +11,8 @@ export const companyCreateSchema = z.object({
     .optional(),
   descricao: z.string().max(500).optional(),
   stand: z.string().max(40).optional(),
+  /** Categoria de empresa dentro do evento. Opcional. */
+  categoryId: z.string().uuid().nullable().optional(),
   responsaveis: z
     .array(
       z.object({
@@ -53,6 +55,10 @@ export const companyDtoSchema = z.object({
   stand: z.string().nullable(),
   descricao: z.string().nullable(),
   ativo: z.boolean(),
+  /** Categoria associada (nome + cor) para mostrar pill na UI. */
+  category: z
+    .object({ id: z.string().uuid(), nome: z.string(), color: z.string().nullable() })
+    .nullable(),
   responsaveis: z.array(
     z.object({
       id: z.string().uuid(),

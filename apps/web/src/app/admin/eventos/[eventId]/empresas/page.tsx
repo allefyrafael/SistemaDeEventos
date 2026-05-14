@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { CompanyDto } from '@eventpass/shared';
+import type { CompanyCategoryDto, CompanyDto } from '@eventpass/shared';
 import { api } from '../../../../../lib/api';
 import { useEventFromParams } from '../../../../../lib/use-event-from-params';
 import { useConfirm } from '../../../../../components/confirm-modal';
@@ -27,6 +27,7 @@ export default function EventCompaniesPage() {
   const { event } = useEventFromParams();
   const confirm = useConfirm();
   const [rows, setRows] = useState<CompanyDto[] | null>(null);
+  const [categories, setCategories] = useState<CompanyCategoryDto[]>([]);
   const [editing, setEditing] = useState<CompanyDto | null>(null);
   const [creating, setCreating] = useState(false);
   const [ok, setOk] = useState<string | null>(null);
@@ -34,8 +35,12 @@ export default function EventCompaniesPage() {
 
   async function load() {
     if (!event) return;
-    const data = await api<CompanyDto[]>(`/events/${event.id}/companies`);
+    const [data, cats] = await Promise.all([
+      api<CompanyDto[]>(`/events/${event.id}/companies`),
+      api<CompanyCategoryDto[]>(`/events/${event.id}/company-categories`),
+    ]);
     setRows(data);
+    setCategories(cats);
   }
 
   useEffect(() => {
@@ -92,6 +97,7 @@ export default function EventCompaniesPage() {
       {creating && (
         <CompanyForm
           eventId={event.id}
+          categories={categories}
           onCancel={() => setCreating(false)}
           onSaved={() => {
             setCreating(false);
@@ -104,6 +110,7 @@ export default function EventCompaniesPage() {
         <CompanyForm
           eventId={event.id}
           initial={editing}
+          categories={categories}
           onCancel={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -136,6 +143,14 @@ export default function EventCompaniesPage() {
                     <td className="px-4 py-3">
                       <p className="font-semibold text-slate-900">{c.nome}</p>
                       <p className="text-xs text-slate-500">/{c.slug}</p>
+                      {c.category && (
+                        <span
+                          className="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+                          style={{ background: c.category.color ?? '#64748B' }}
+                        >
+                          {c.category.nome}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-700">{c.stand ?? '—'}</td>
                     <td className="px-4 py-3 text-slate-700">
@@ -188,6 +203,14 @@ export default function EventCompaniesPage() {
                       /{c.slug}
                       {c.stand ? ` · stand ${c.stand}` : ''}
                     </p>
+                    {c.category && (
+                      <span
+                        className="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+                        style={{ background: c.category.color ?? '#64748B' }}
+                      >
+                        {c.category.nome}
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-shrink-0 gap-3 text-xs font-medium">
                     <button type="button" onClick={() => setEditing(c)} className="text-brand-primary">
@@ -222,17 +245,20 @@ export default function EventCompaniesPage() {
 function CompanyForm({
   eventId,
   initial,
+  categories,
   onSaved,
   onCancel,
 }: {
   eventId: string;
   initial?: CompanyDto;
+  categories: CompanyCategoryDto[];
   onSaved: () => void;
   onCancel: () => void;
 }) {
   const [nome, setNome] = useState(initial?.nome ?? '');
   const [stand, setStand] = useState(initial?.stand ?? '');
   const [descricao, setDescricao] = useState(initial?.descricao ?? '');
+  const [categoryId, setCategoryId] = useState<string>(initial?.category?.id ?? '');
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>(
     initial
       ? initial.responsaveis.map((r) => ({
@@ -258,6 +284,7 @@ function CompanyForm({
         nome,
         stand: stand || undefined,
         descricao: descricao || undefined,
+        categoryId: categoryId || null,
         responsaveis: responsaveis.map((r) => ({
           nome: r.nome,
           cpf: r.cpf,
@@ -299,6 +326,29 @@ function CompanyForm({
         <Field label="Stand (opcional)">
           <TextInput value={stand ?? ''} onChange={(e) => setStand(e.target.value)} />
         </Field>
+        <Field
+          label="Categoria (opcional)"
+          hint={
+            categories.length === 0
+              ? 'Cadastre categorias na aba Categorias.'
+              : 'Agrupa visualmente e libera carimbos em massa via stamp.'
+          }
+        >
+          <select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base focus:border-brand-primary focus:outline-none"
+            disabled={categories.length === 0}
+          >
+            <option value="">— Sem categoria —</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div /> {/* coluna vazia pra alinhar grid em md */}
         <div className="md:col-span-2">
           <Field label="Descricao">
             <textarea

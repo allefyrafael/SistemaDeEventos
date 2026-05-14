@@ -150,22 +150,37 @@ export class ScanService {
       companyId = myCompanies[0].id;
     }
 
-    // 4) Valida stamp configurado (com lista de empresas autorizadas)
+    // 4) Valida stamp configurado (com autorizacao por categoria + lista)
     const stamp = await this.prisma.stampConfig.findFirst({
       where: { id: input.stampConfigId, eventId },
       include: { authorizedCompanies: { select: { companyId: true } } },
     });
     if (!stamp) throw new NotFoundException('Stamp nao encontrado');
 
-    // RN02: se ha empresas autorizadas, a company atual precisa estar na
-    // lista. Lista vazia = qualquer empresa do evento pode carimbar.
-    const allowedCompanyIds = stamp.authorizedCompanies.map((a) => a.companyId);
-    if (allowedCompanyIds.length > 0 && !allowedCompanyIds.includes(companyId)) {
-      return {
-        status: 'rejected',
-        reason: 'Esta empresa nao pode carimbar este item (RN02)',
-        mustAnswerFeedback: false,
-      };
+    // RN02 (ampliado): autorizacao final = uniao de
+    //  - empresas listadas em StampConfigCompany (authorizedCompanies)
+    //  - empresas cuja categoryId == stamp.companyCategoryId (atalho)
+    //  Sem nenhum dos dois = qualquer empresa do evento pode.
+    const hasCompanyList = stamp.authorizedCompanies.length > 0;
+    const hasCategory = !!stamp.companyCategoryId;
+
+    if (hasCompanyList || hasCategory) {
+      const allowedCompanyIds = stamp.authorizedCompanies.map((a) => a.companyId);
+      let permitido = allowedCompanyIds.includes(companyId);
+      if (!permitido && hasCategory) {
+        const companyCat = await this.prisma.company.findUnique({
+          where: { id: companyId },
+          select: { categoryId: true },
+        });
+        permitido = companyCat?.categoryId === stamp.companyCategoryId;
+      }
+      if (!permitido) {
+        return {
+          status: 'rejected',
+          reason: 'Esta empresa nao pode carimbar este item (RN02)',
+          mustAnswerFeedback: false,
+        };
+      }
     }
 
     // 5) Valida aluno existe e pertence ao evento
@@ -324,19 +339,31 @@ export class ScanService {
 
     const myCompanies = await this.prisma.company.findMany({
       where: { eventId, responsibles: { some: { userId: actor.id } } },
-      select: { id: true },
+      select: { id: true, categoryId: true },
     });
     if (myCompanies.length === 0) return [];
     const companyIds = myCompanies.map((c) => c.id);
+    const myCategoryIds = myCompanies
+      .map((c) => c.categoryId)
+      .filter((id): id is string => !!id);
 
     const rows = await this.prisma.stampConfig.findMany({
       where: {
         eventId,
         OR: [
-          // Sem nenhuma empresa autorizada = livre.
-          { authorizedCompanies: { none: {} } },
-          // Tem alguma empresa que pertence ao user.
+          // Stamp livre: sem categoria E sem lista de empresas.
+          {
+            AND: [
+              { authorizedCompanies: { none: {} } },
+              { companyCategoryId: null },
+            ],
+          },
+          // Tem alguma das empresas do user na lista de autorizadas.
           { authorizedCompanies: { some: { companyId: { in: companyIds } } } },
+          // Stamp autorizado pela categoria de uma das empresas do user.
+          ...(myCategoryIds.length > 0
+            ? [{ companyCategoryId: { in: myCategoryIds } }]
+            : []),
         ],
       },
       orderBy: [{ ordem: 'asc' }, { createdAt: 'asc' }],

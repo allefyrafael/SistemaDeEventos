@@ -1,7 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { StampConfigDto, CompanyDto } from '@eventpass/shared';
+import type {
+  CompanyCategoryDto,
+  CompanyDto,
+  StampConfigDto,
+} from '@eventpass/shared';
 import { api } from '../../../../../lib/api';
 import { useEventFromParams } from '../../../../../lib/use-event-from-params';
 import { useConfirm } from '../../../../../components/confirm-modal';
@@ -18,6 +22,7 @@ export default function EventStampsPage() {
   const confirm = useConfirm();
   const [rows, setRows] = useState<StampConfigDto[] | null>(null);
   const [companies, setCompanies] = useState<CompanyDto[]>([]);
+  const [categories, setCategories] = useState<CompanyCategoryDto[]>([]);
   const [editing, setEditing] = useState<StampConfigDto | null>(null);
   const [creating, setCreating] = useState(false);
   const [ok, setOk] = useState<string | null>(null);
@@ -25,12 +30,14 @@ export default function EventStampsPage() {
 
   async function load() {
     if (!event) return;
-    const [stamps, comps] = await Promise.all([
+    const [stamps, comps, cats] = await Promise.all([
       api<StampConfigDto[]>(`/events/${event.id}/passport/stamps`),
       api<CompanyDto[]>(`/events/${event.id}/companies`),
+      api<CompanyCategoryDto[]>(`/events/${event.id}/company-categories`),
     ]);
     setRows(stamps);
     setCompanies(comps);
+    setCategories(cats);
   }
 
   async function remove(s: StampConfigDto) {
@@ -78,6 +85,7 @@ export default function EventStampsPage() {
         <StampForm
           eventId={event.id}
           companies={companies}
+          categories={categories}
           onCancel={() => setCreating(false)}
           onSaved={() => {
             setCreating(false);
@@ -90,6 +98,7 @@ export default function EventStampsPage() {
         <StampForm
           eventId={event.id}
           companies={companies}
+          categories={categories}
           initial={editing}
           onCancel={() => setEditing(null)}
           onSaved={() => {
@@ -121,21 +130,27 @@ export default function EventStampsPage() {
                   )}
                 </p>
                 {s.descricao && <p className="text-xs text-slate-500">{s.descricao}</p>}
-                <p className="mt-1 text-xs text-slate-500">
-                  {s.authorizedCompanies.length === 0 ? (
-                    <span className="text-slate-500">
-                      Qualquer empresa pode carimbar
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                  {s.authorizedCategory && (
+                    <span
+                      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+                      style={{ background: s.authorizedCategory.color ?? '#64748B' }}
+                      title="Categoria autorizada"
+                    >
+                      Cat: {s.authorizedCategory.nome}
                     </span>
-                  ) : (
+                  )}
+                  {s.authorizedCompanies.length === 0 && !s.authorizedCategory ? (
+                    <span>Qualquer empresa pode carimbar</span>
+                  ) : s.authorizedCompanies.length > 0 ? (
                     <span>
-                      So{' '}
                       <span className="font-semibold text-slate-700">
                         {s.authorizedCompanies.map((c) => c.nome).join(', ')}
                       </span>{' '}
-                      pode carimbar (RN02)
+                      {s.authorizedCategory ? '+ categoria' : '(RN02)'}
                     </span>
-                  )}
-                </p>
+                  ) : null}
+                </div>
               </div>
               <div className="flex gap-2">
                 <button
@@ -165,12 +180,14 @@ function StampForm({
   eventId,
   initial,
   companies,
+  categories,
   onSaved,
   onCancel,
 }: {
   eventId: string;
   initial?: StampConfigDto;
   companies: CompanyDto[];
+  categories: CompanyCategoryDto[];
   onSaved: () => void;
   onCancel: () => void;
 }) {
@@ -178,6 +195,9 @@ function StampForm({
   const [descricao, setDescricao] = useState(initial?.descricao ?? '');
   const [ordem, setOrdem] = useState(initial?.ordem ?? 0);
   const [obrigatorio, setObrigatorio] = useState(initial?.obrigatorio ?? true);
+  const [categoryId, setCategoryId] = useState<string>(
+    initial?.authorizedCategory?.id ?? '',
+  );
   const [authorizedIds, setAuthorizedIds] = useState<Set<string>>(
     () => new Set(initial?.authorizedCompanies.map((c) => c.id) ?? []),
   );
@@ -207,6 +227,7 @@ function StampForm({
         ordem: Number(ordem),
         obrigatorio,
         authorizedCompanyIds: Array.from(authorizedIds),
+        companyCategoryId: categoryId || null,
       };
       if (initial) {
         await api(`/events/${eventId}/passport/stamps/${initial.id}`, {
@@ -261,11 +282,36 @@ function StampForm({
         </div>
 
         <div className="md:col-span-2">
+          <Field
+            label="Categoria autorizada (atalho)"
+            hint={
+              categories.length === 0
+                ? 'Cadastre categorias na aba Categorias para liberar carimbos em massa.'
+                : 'Quando preenchida, qualquer empresa da categoria pode conceder este carimbo (alem das marcadas abaixo).'
+            }
+          >
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base focus:border-brand-primary focus:outline-none"
+              disabled={categories.length === 0}
+            >
+              <option value="">— Sem categoria —</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        <div className="md:col-span-2">
           <p className="text-sm font-medium text-slate-700">Empresas autorizadas</p>
           <p className="mt-1 text-xs text-slate-500">
-            Marque as empresas que podem conceder este carimbo. Deixe vazio
-            para permitir que QUALQUER empresa do evento carimbe (util para
-            visitas livres).
+            Marque empresas especificas (alem da categoria, se selecionada). Se
+            categoria e lista estiverem vazios, QUALQUER empresa do evento pode
+            carimbar este item.
           </p>
           {companies.length === 0 ? (
             <p className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs text-slate-500">
@@ -290,9 +336,13 @@ function StampForm({
             </ul>
           )}
           <p className="mt-2 text-xs text-slate-500">
-            {authorizedIds.size === 0
+            {authorizedIds.size === 0 && !categoryId
               ? 'Qualquer empresa pode carimbar este item.'
-              : `${authorizedIds.size} empresa(s) selecionada(s).`}
+              : authorizedIds.size > 0 && categoryId
+                ? `${authorizedIds.size} empresa(s) selecionada(s) + 1 categoria.`
+                : authorizedIds.size > 0
+                  ? `${authorizedIds.size} empresa(s) selecionada(s).`
+                  : '1 categoria selecionada.'}
           </p>
         </div>
 

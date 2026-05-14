@@ -17,6 +17,7 @@ interface StampWithCompanies {
   authorizedCompanies: Array<{
     company: { id: string; nome: string };
   }>;
+  companyCategory: { id: string; nome: string; color: string | null } | null;
 }
 
 function toDto(s: StampWithCompanies): StampConfigDto {
@@ -32,6 +33,13 @@ function toDto(s: StampWithCompanies): StampConfigDto {
     ordem: s.ordem,
     obrigatorio: s.obrigatorio,
     authorizedCompanies: companies,
+    authorizedCategory: s.companyCategory
+      ? {
+          id: s.companyCategory.id,
+          nome: s.companyCategory.nome,
+          color: s.companyCategory.color,
+        }
+      : null,
     // Compat: primeira empresa autorizada como `entidadeAutorizada`.
     entidadeAutorizada: companies.length > 0 ? companies[0] : null,
   };
@@ -52,6 +60,7 @@ export class PassportService {
         authorizedCompanies: {
           include: { company: { select: { id: true, nome: true } } },
         },
+        companyCategory: { select: { id: true, nome: true, color: true } },
       },
       orderBy: [{ ordem: 'asc' }, { createdAt: 'asc' }],
     });
@@ -67,6 +76,9 @@ export class PassportService {
     if (companyIds.length > 0) {
       await this.assertCompaniesBelongToEvent(eventId, companyIds);
     }
+    if (input.companyCategoryId) {
+      await this.assertCategoryBelongsToEvent(eventId, input.companyCategoryId);
+    }
 
     const row = await this.prisma.stampConfig.create({
       data: {
@@ -75,6 +87,7 @@ export class PassportService {
         descricao: input.descricao,
         ordem: input.ordem ?? 0,
         obrigatorio: input.obrigatorio ?? true,
+        companyCategoryId: input.companyCategoryId ?? null,
         authorizedCompanies: {
           create: companyIds.map((companyId) => ({ companyId })),
         },
@@ -83,6 +96,7 @@ export class PassportService {
         authorizedCompanies: {
           include: { company: { select: { id: true, nome: true } } },
         },
+        companyCategory: { select: { id: true, nome: true, color: true } },
       },
     });
     return toDto(row);
@@ -110,6 +124,10 @@ export class PassportService {
       }
     }
 
+    if (input.companyCategoryId) {
+      await this.assertCategoryBelongsToEvent(eventId, input.companyCategoryId);
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await tx.stampConfig.update({
         where: { id: stampId },
@@ -118,6 +136,10 @@ export class PassportService {
           descricao: input.descricao ?? undefined,
           ordem: input.ordem ?? undefined,
           obrigatorio: input.obrigatorio ?? undefined,
+          companyCategoryId:
+            input.companyCategoryId === undefined
+              ? undefined
+              : (input.companyCategoryId ?? null),
         },
       });
       if (companyIds !== null) {
@@ -136,6 +158,7 @@ export class PassportService {
         authorizedCompanies: {
           include: { company: { select: { id: true, nome: true } } },
         },
+        companyCategory: { select: { id: true, nome: true, color: true } },
       },
     });
     return toDto(row);
@@ -225,6 +248,19 @@ export class PassportService {
       select: { id: true },
     });
     if (!ok) throw new NotFoundException('Evento nao encontrado');
+  }
+
+  private async assertCategoryBelongsToEvent(
+    eventId: string,
+    categoryId: string,
+  ): Promise<void> {
+    const ok = await this.prisma.companyCategory.findFirst({
+      where: { id: categoryId, eventId },
+      select: { id: true },
+    });
+    if (!ok) {
+      throw new NotFoundException('Categoria nao pertence a este evento');
+    }
   }
 
   private async assertCompaniesBelongToEvent(

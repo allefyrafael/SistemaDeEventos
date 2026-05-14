@@ -117,16 +117,17 @@ model Event {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  members       EventMember[]
-  companies     Company[]
-  stampConfigs  StampConfig[]
-  progressos    StudentProgress[]
-  avaliacoes    Evaluation[]
-  feedbackTpls  FeedbackTemplate[]
-  venueMap      VenueMap?
-  mapLocations  MapLocation[]
-  activities    Activity[]
-  certificates  Certificate[]
+  members            EventMember[]
+  companies          Company[]
+  companyCategories  CompanyCategory[]
+  stampConfigs       StampConfig[]
+  progressos         StudentProgress[]
+  avaliacoes         Evaluation[]
+  feedbackTpls       FeedbackTemplate[]
+  venueMap           VenueMap?
+  mapLocations       MapLocation[]
+  activities         Activity[]
+  certificates       Certificate[]
 
   @@index([status, startsAt])
   @@map("events")
@@ -154,17 +155,26 @@ model EventMember {
 // ------------------------------------------------------------
 
 model Company {
-  id        String   @id @default(uuid(7))
-  eventId   String
-  nome      String
-  slug      String
-  logoKey   String?  // chave no S3
-  meta      Json     @default("{}") // livre para campos extras (stand, descricao, etc)
-  ativo     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid(7))
+  eventId    String
+  /**
+   * Categoria opcional dentro do evento (ex.: "Tecnologia", "Saude",
+   * "Educacao"). Usado para agrupar empresas no admin e tambem como
+   * atalho de autorizacao: um StampConfig pode apontar para uma
+   * categoria inteira via companyCategoryId, liberando todas as
+   * empresas dela como autorizadas a conceder o carimbo (RN02).
+   */
+  categoryId String?
+  nome       String
+  slug       String
+  logoKey    String?  // chave no S3
+  meta       Json     @default("{}") // livre para campos extras (stand, descricao, etc)
+  ativo      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   event              Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  category           CompanyCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   responsibles       CompanyResponsible[]
   stampsGranted      StudentProgress[]    @relation("CompanyOfProgress")
   stampConfigs       StampConfig[]        @relation("EntidadeAutorizada")  // legado (1:1)
@@ -174,7 +184,34 @@ model Company {
 
   @@unique([eventId, slug])
   @@index([eventId, ativo])
+  @@index([categoryId])
   @@map("companies")
+}
+
+/**
+ * Categoria de empresa dentro de um evento (ex.: "Tecnologia", "Saude").
+ * Serve para 2 propositos:
+ *   1) Agrupar visualmente empresas no admin.
+ *   2) Autorizacao em massa de stamps — um StampConfig pode liberar todas
+ *      as empresas de uma categoria via companyCategoryId.
+ * Cor opcional pra pill na UI (hex, ex.: "#0EA5E9").
+ */
+model CompanyCategory {
+  id        String   @id @default(uuid(7))
+  eventId   String
+  nome      String
+  color     String?  // hex; null = neutro (slate)
+  ordem     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event        Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  companies    Company[]
+  stampConfigs StampConfig[]
+
+  @@unique([eventId, nome])
+  @@index([eventId, ordem])
+  @@map("company_categories")
 }
 
 model CompanyResponsible {
@@ -211,15 +248,28 @@ model StampConfig {
   // LEGADO: nao usar. Use StampConfigCompany abaixo.
   entidadeAutorizadaId String?
 
+  /**
+   * Atalho de autorizacao por CATEGORIA. Quando preenchido, qualquer
+   * empresa cuja Company.categoryId == este id pode conceder o carimbo
+   * (RN02 ampliado). Coexiste com StampConfigCompany (lista N:M):
+   * - companyCategoryId definido => libera todas da categoria.
+   * - StampConfigCompany com registros => libera essas empresas
+   *   especificas (alem das da categoria, se houver).
+   * - Ambos vazios => qualquer empresa do evento pode carimbar.
+   */
+  companyCategoryId    String?
+
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  event                Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  entidadeAutorizada   Company?  @relation("EntidadeAutorizada", fields: [entidadeAutorizadaId], references: [id], onDelete: SetNull)
+  event                Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  entidadeAutorizada   Company?          @relation("EntidadeAutorizada", fields: [entidadeAutorizadaId], references: [id], onDelete: SetNull)
+  companyCategory      CompanyCategory?  @relation(fields: [companyCategoryId], references: [id], onDelete: SetNull)
   progressos           StudentProgress[]
   authorizedCompanies  StampConfigCompany[]
 
   @@index([eventId, ordem])
+  @@index([companyCategoryId])
   @@map("stamp_configs")
 }
 
