@@ -165,6 +165,31 @@ function EventContextLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-5">
       <EventHeader event={event} />
+      {/*
+        Aviso de evento em rascunho. Eventos DRAFT NAO aparecem em
+        /events/public — ou seja, nao surgem na home nem nos selects
+        das telas de cadastro. Sem esse banner o admin cria o evento e
+        nao entende por que participantes nao o veem.
+      */}
+      {event.status === 'DRAFT' && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-amber-900">
+              Este evento esta em rascunho
+            </p>
+            <p className="mt-0.5 text-xs text-amber-800">
+              Eventos em rascunho nao aparecem para participantes nem nas telas
+              de cadastro. Publique para abrir as inscricoes.
+            </p>
+          </div>
+          <Link
+            href={`/admin/eventos/${event.id}/configuracoes` as Route}
+            className="flex-shrink-0 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-amber-700"
+          >
+            Publicar evento
+          </Link>
+        </div>
+      )}
       <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-1">
         {availableTabs.map((t) => {
           const href = tabHref(event.id, t.segment);
